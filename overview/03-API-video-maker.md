@@ -6,91 +6,30 @@
 
 **Base URL:** `https://api.your-domain.com` or `http://localhost:4000`
 
-**Auth:** JWT Bearer token in Authorization header
+**Auth:** Disabled for initial development (will be added later)
 
 ---
 
-## Authentication
+## Authentication (DISABLED)
 
+> **Note:** Authentication is disabled for initial development. All endpoints are publicly accessible. User authentication will be added in a later phase.
+
+<!--
 ### POST /auth/signup
-
-Create new user account.
-
-```
-Request:
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-
-Response 201:
-{
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "createdAt": "2024-01-15T10:00:00Z"
-  }
-}
-
-Errors:
-400 - Invalid email or password too short
-409 - Email already exists
-```
-
 ### POST /auth/login
-
-Login existing user.
-
-```
-Request:
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-
-Response 200:
-{
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "createdAt": "2024-01-15T10:00:00Z"
-  }
-}
-
-Errors:
-401 - Invalid credentials
-```
-
 ### GET /auth/me
-
-Get current user info. **Requires auth.**
-
-```
-Headers:
-Authorization: Bearer <token>
-
-Response 200:
-{
-  "id": "uuid",
-  "email": "user@example.com",
-  "createdAt": "2024-01-15T10:00:00Z"
-}
-
-Errors:
-401 - Invalid or expired token
-```
+These endpoints will be implemented when auth is enabled.
+-->
 
 ---
 
 ## Projects
 
-All endpoints require authentication.
+No authentication required (auth disabled).
 
 ### GET /projects
 
-Get all projects for current user.
+Get all projects.
 
 ```
 Response 200:
@@ -152,7 +91,6 @@ Response 200:
 
 Errors:
 404 - Project not found
-403 - Not your project
 ```
 
 ### PUT /projects/:id
@@ -661,39 +599,56 @@ Response 200:
 }
 ```
 
-### POST /images/:id/move
+### POST /images/:id/copy
 
-Move image to another frame or project.
+Copy image to a frame. **Use this for context images → frame.**
+
+The original image stays in place; a new Image record is created pointing to the same Cloudinary asset.
 
 ```
-Request (move within project):
+Request:
+{
+  "targetFrameId": "uuid"
+}
+
+Response 201:
+{
+  "id": "uuid",          // New image ID
+  "url": "...",
+  "cloudinaryId": "...",
+  "frameId": "uuid"
+}
+```
+
+### POST /images/:id/move
+
+Move image to another frame or project's gallery. **Updates the image record in place.**
+
+```
+Request (move to another frame - same or different project):
 {
   "targetType": "frame",
   "targetFrameId": "uuid"
 }
 
-Request (move to another project - gallery):
+Request (move to another project's gallery):
 {
   "targetType": "gallery",
   "targetProjectId": "uuid"
 }
 
-Request (move to another project - specific frame):
-{
-  "targetType": "frame",
-  "targetProjectId": "uuid",
-  "targetFrameId": "uuid"
-}
-
 Response 200:
 {
   "success": true,
-  "newLocation": {
-    "projectId": "uuid",
-    "frameId": "uuid" | null
+  "image": {
+    "id": "uuid",
+    "frameId": "uuid" | null,
+    "galleryProjectId": "uuid" | null
   }
 }
 ```
+
+**Note:** When moving to gallery, the image's `messageId`/`frameId` is cleared and `galleryProjectId` is set.
 
 ### POST /gallery/:id/assign
 
@@ -718,8 +673,11 @@ Response 200:
 
 ---
 
-## Export
+## Export (DISABLED)
 
+> **Note:** Video export is disabled for initial development. Will be implemented in a later phase.
+
+<!--
 ### POST /videos/:id/export
 
 Generate video from selected frame images.
@@ -734,6 +692,7 @@ Errors:
 400 - No frames with selected images
 500 - Cloudinary error
 ```
+-->
 
 ---
 
@@ -751,7 +710,7 @@ All errors follow this format:
 
 Common HTTP status codes:
 - 400 - Bad request (validation error)
-- 401 - Unauthorized (no/invalid token)
-- 403 - Forbidden (not your resource)
 - 404 - Not found
 - 500 - Server error
+
+Note: 401/403 errors will be added when authentication is enabled.

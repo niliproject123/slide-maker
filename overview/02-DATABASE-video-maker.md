@@ -6,32 +6,29 @@
 
 **ORM:** Prisma
 
+**Note:** Authentication is disabled for initial development. User/auth will be added later.
+
 ---
 
 ## Entity Relationship Diagram
 
 ```
 ┌──────────┐
-│   User   │
+│ Project  │
 └────┬─────┘
      │ 1:N
      ▼
 ┌──────────┐
-│ Project  │◄────────────────────────┐
-└────┬─────┘                         │
-     │ 1:N                           │
-     ▼                               │
-┌──────────┐                    ┌────┴─────┐
-│  Video   │                    │ Gallery  │
-└────┬─────┘                    │  Image   │
-     │                          └──────────┘
+│  Video   │
+└────┬─────┘
+     │
      ├─────────────┐
      │ 1:1         │ 1:N
      ▼             ▼
 ┌──────────┐  ┌──────────┐
 │ Context  │  │  Frame   │◄─────────┐
 └────┬─────┘  └────┬─────┘          │
-     │             │                │ selectedImage
+     │             │                │ selectedImage (N:1)
      ├─────┐       ├─────┐          │
      │     │       │     │          │
      │ 1:N │ 1:N   │ 1:N │ 1:N      │
@@ -45,12 +42,19 @@
           ┌───────┐ ┌───────┐
           │ Image │ │ Image │
           └───────┘ └───────┘
+
+┌──────────┐
+│  Image   │──── can also have galleryProjectId (for images moved from other projects)
+└──────────┘
 ```
 
 **Image sources:**
 - Generated via Message (has messageId)
 - Uploaded directly to Frame (has frameId, no messageId)
+- In Gallery (has galleryProjectId - moved from another project)
 - Context images (separate ContextImage model)
+
+**Note:** Same image can be selected by multiple Frames (N:1 relationship).
 
 ---
 
@@ -68,40 +72,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String    // bcrypt hashed
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  
-  projects  Project[]
-}
+// Note: User model disabled for initial development
+// model User {
+//   id        String    @id @default(uuid())
+//   email     String    @unique
+//   password  String    // bcrypt hashed
+//   createdAt DateTime  @default(now())
+//   updatedAt DateTime  @updatedAt
+//   projects  Project[]
+// }
 
 model Project {
   id        String   @id @default(uuid())
   name      String
-  userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  videos        Video[]
-  galleryImages GalleryImage[]
-  
-  @@index([userId])
-}
 
-model GalleryImage {
-  id           String   @id @default(uuid())
-  url          String
-  cloudinaryId String
-  projectId    String
-  createdAt    DateTime @default(now())
-  
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  @@index([projectId])
+  videos        Video[]
+  galleryImages Image[] @relation("GalleryImages")  // Images moved from other projects
 }
 
 model Video {
@@ -147,17 +135,18 @@ model Frame {
   title           String
   order           Int
   videoId         String
-  selectedImageId String?  @unique
+  selectedImageId String?  // No @unique - same image can be selected by multiple frames
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  
+
   video         Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
   selectedImage Image?    @relation("SelectedImage", fields: [selectedImageId], references: [id], onDelete: SetNull)
   messages      Message[] // Generated images come via messages
   images        Image[]   @relation("FrameImages") // Uploaded images directly on frame
-  
+
   @@index([videoId])
   @@index([videoId, order])
+  @@index([selectedImageId])
 }
 
 model Message {
@@ -177,19 +166,22 @@ model Message {
 }
 
 model Image {
-  id           String   @id @default(uuid())
-  url          String
-  cloudinaryId String
-  messageId    String?  // Set if generated via message
-  frameId      String?  // Set if uploaded directly to frame
-  createdAt    DateTime @default(now())
-  
-  message     Message? @relation("MessageImages", fields: [messageId], references: [id], onDelete: Cascade)
-  frame       Frame?   @relation("FrameImages", fields: [frameId], references: [id], onDelete: Cascade)
-  selectedFor Frame?   @relation("SelectedImage")
-  
+  id               String   @id @default(uuid())
+  url              String
+  cloudinaryId     String
+  messageId        String?  // Set if generated via message
+  frameId          String?  // Set if uploaded directly to frame
+  galleryProjectId String?  // Set if moved to another project's gallery
+  createdAt        DateTime @default(now())
+
+  message        Message? @relation("MessageImages", fields: [messageId], references: [id], onDelete: Cascade)
+  frame          Frame?   @relation("FrameImages", fields: [frameId], references: [id], onDelete: Cascade)
+  galleryProject Project? @relation("GalleryImages", fields: [galleryProjectId], references: [id], onDelete: Cascade)
+  selectedFor    Frame[]  @relation("SelectedImage")  // Can be selected by multiple frames
+
   @@index([messageId])
   @@index([frameId])
+  @@index([galleryProjectId])
 }
 ```
 
@@ -217,7 +209,6 @@ npx prisma studio
 
 | Relation | Type | On Delete |
 |----------|------|-----------|
-| User → Projects | 1:N | Cascade |
 | Project → Videos | 1:N | Cascade |
 | Project → GalleryImages | 1:N | Cascade |
 | Video → Context | 1:1 | Cascade |
@@ -227,7 +218,9 @@ npx prisma studio
 | Frame → Messages | 1:N | Cascade |
 | Frame → Images (uploaded) | 1:N | Cascade |
 | Message → Images (generated) | 1:N | Cascade |
-| Frame → SelectedImage | 1:1 | SetNull |
+| Image → SelectedFor (Frames) | 1:N | SetNull |
+
+**Note:** User → Projects relationship disabled for initial development.
 
 ---
 
@@ -238,15 +231,19 @@ npx prisma studio
 | Generated (frame) | Image (messageId set) | GPT Image API via Message |
 | Uploaded (frame) | Image (frameId set) | User upload |
 | Context reference | ContextImage | User upload |
-| Gallery | GalleryImage | Saved from frames |
+| Gallery | Image (galleryProjectId set) | Moved from another project |
 
 ---
 
 ## Notes
 
 - **Image** can belong to Message (generated) OR Frame directly (uploaded), but not both
+- **Image** can also be in a project's Gallery (galleryProjectId set) when moved from another project
+- **Same Image can be selected by multiple Frames** - no uniqueness constraint
 - **ContextImage** is separate - these are reference images for generation, not frame images
 - **Context.content** holds the text context
 - **Frame.selectedImageId** uses `SetNull` so deleting an image doesn't delete the frame
 - All IDs are UUIDs for security
 - Indexes added for common query patterns
+- **Authentication disabled** for initial development - will be added later
+- **Video export disabled** for initial development - will be added later
