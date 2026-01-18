@@ -33,6 +33,14 @@
 - [x] Button, Input, Textarea, Card, Dialog UI components
 - [x] Integrated components within pages
 
+### UI Enhancements (Added)
+- [x] Upload images to frames
+- [x] Attach reference images to prompt
+- [x] Show selected image thumbnail in frame sidebar
+- [x] Fullscreen image viewer (click any image)
+- [x] Maximize toggle for context and prompt textboxes
+- [x] Sample gallery images on init
+
 ### Quality
 - [x] Unit tests passing (23 tests)
 - [x] TypeScript compiles without errors
