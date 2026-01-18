@@ -27,6 +27,20 @@ const storage = {
   galleryImages: new Map<string, Set<string>>(), // projectId -> Set<imageId>
 };
 
+// Helper to create an image
+function createImageInternal(url?: string): Image {
+  const seed = `init-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const image: Image = {
+    id: uuidv4(),
+    url: url || `https://picsum.photos/seed/${seed}/1792/1024`,
+    cloudinaryId: `mock-${seed}`,
+    messageId: null,
+    createdAt: new Date(),
+  };
+  storage.images.set(image.id, image);
+  return image;
+}
+
 // Initialize with some sample data
 function initializeMockData() {
   if (storage.projects.size > 0) return;
@@ -51,6 +65,22 @@ function initializeMockData() {
   // Create a video for project2
   const video3 = createVideoInternal(project2.id, "Brand Story");
   createFrameInternal(video3.id, "Opening Scene");
+
+  // Add fake images to gallery for project1
+  const galleryImages1 = storage.galleryImages.get(project1.id) || new Set();
+  for (let i = 0; i < 6; i++) {
+    const img = createImageInternal(`https://picsum.photos/seed/gallery-${i}/1792/1024`);
+    galleryImages1.add(img.id);
+  }
+  storage.galleryImages.set(project1.id, galleryImages1);
+
+  // Add fake images to gallery for project2
+  const galleryImages2 = storage.galleryImages.get(project2.id) || new Set();
+  for (let i = 0; i < 3; i++) {
+    const img = createImageInternal(`https://picsum.photos/seed/gallery2-${i}/1792/1024`);
+    galleryImages2.add(img.id);
+  }
+  storage.galleryImages.set(project2.id, galleryImages2);
 }
 
 // Helper to create project without triggering re-init
@@ -554,6 +584,50 @@ export const mockApi = {
 
   // Images
   images: {
+    async upload(
+      targetType: "frame" | "context" | "gallery",
+      targetId: string,
+      _file?: File // In real impl, this would be used
+    ): Promise<Image> {
+      initializeMockData();
+      await delay(300); // Simulate upload time
+
+      // Create a fake uploaded image using picsum
+      const seed = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const image: Image = {
+        id: uuidv4(),
+        url: `https://picsum.photos/seed/${seed}/1792/1024`,
+        cloudinaryId: `mock-upload-${seed}`,
+        messageId: null,
+        createdAt: new Date(),
+      };
+      storage.images.set(image.id, image);
+
+      // Add to target
+      switch (targetType) {
+        case "frame": {
+          const frameImages = storage.frameImages.get(targetId) || new Set();
+          frameImages.add(image.id);
+          storage.frameImages.set(targetId, frameImages);
+          break;
+        }
+        case "context": {
+          const contextImages = storage.contextImages.get(targetId) || new Set();
+          contextImages.add(image.id);
+          storage.contextImages.set(targetId, contextImages);
+          break;
+        }
+        case "gallery": {
+          const galleryImages = storage.galleryImages.get(targetId) || new Set();
+          galleryImages.add(image.id);
+          storage.galleryImages.set(targetId, galleryImages);
+          break;
+        }
+      }
+
+      return image;
+    },
+
     async select(frameId: string, imageId: string): Promise<Frame | null> {
       initializeMockData();
       await delay(100);
