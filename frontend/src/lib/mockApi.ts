@@ -260,7 +260,10 @@ export const mockApi = {
               const msgImages = Array.from(storage.images.values()).filter(
                 (img) => img.messageId === msg.id
               );
-              return { ...msg, images: msgImages };
+              const attachedImages = (msg.attachedImageIds || [])
+                .map((id) => storage.images.get(id))
+                .filter((img): img is Image => img !== undefined);
+              return { ...msg, images: msgImages, attachedImages };
             });
 
           const selectedImage = frame.selectedImageId
@@ -349,11 +352,19 @@ export const mockApi = {
 
           const messages = Array.from(storage.messages.values())
             .filter((m) => m.frameId === frame.id)
+            .sort(
+              (a, b) =>
+                new Date(a.createdAt).getTime() -
+                new Date(b.createdAt).getTime()
+            )
             .map((msg): MessageWithImages => {
               const msgImages = Array.from(storage.images.values()).filter(
                 (img) => img.messageId === msg.id
               );
-              return { ...msg, images: msgImages };
+              const attachedImages = (msg.attachedImageIds || [])
+                .map((id) => storage.images.get(id))
+                .filter((img): img is Image => img !== undefined);
+              return { ...msg, images: msgImages, attachedImages };
             });
 
           const selectedImage = frame.selectedImageId
@@ -470,7 +481,10 @@ export const mockApi = {
           const msgImages = Array.from(storage.images.values()).filter(
             (img) => img.messageId === msg.id
           );
-          return { ...msg, images: msgImages };
+          const attachedImages = (msg.attachedImageIds || [])
+            .map((id) => storage.images.get(id))
+            .filter((img): img is Image => img !== undefined);
+          return { ...msg, images: msgImages, attachedImages };
         });
 
       return { ...context, images, messages };
@@ -495,7 +509,8 @@ export const mockApi = {
     async images(
       frameId: string,
       prompt: string,
-      withContext: boolean = false
+      withContext: boolean = false,
+      attachedImageIds: string[] = []
     ): Promise<MessageWithImages> {
       initializeMockData();
       await delay(500); // Simulate generation time
@@ -510,9 +525,15 @@ export const mockApi = {
         withContext,
         frameId,
         contextId: null,
+        attachedImageIds,
         createdAt: new Date(),
       };
       storage.messages.set(message.id, message);
+
+      // Get attached images
+      const attachedImages = attachedImageIds
+        .map((id) => storage.images.get(id))
+        .filter((img): img is Image => img !== undefined);
 
       // Generate 4 placeholder images using picsum
       const images: Image[] = [];
@@ -534,12 +555,13 @@ export const mockApi = {
         storage.frameImages.set(frameId, frameImages);
       }
 
-      return { ...message, images };
+      return { ...message, images, attachedImages };
     },
 
     async contextImages(
       contextId: string,
-      prompt: string
+      prompt: string,
+      attachedImageIds: string[] = []
     ): Promise<MessageWithImages> {
       initializeMockData();
       await delay(500);
@@ -554,9 +576,15 @@ export const mockApi = {
         withContext: false,
         frameId: null,
         contextId,
+        attachedImageIds,
         createdAt: new Date(),
       };
       storage.messages.set(message.id, message);
+
+      // Get attached images
+      const attachedImages = attachedImageIds
+        .map((id) => storage.images.get(id))
+        .filter((img): img is Image => img !== undefined);
 
       // Generate 4 placeholder images
       const images: Image[] = [];
@@ -578,7 +606,7 @@ export const mockApi = {
         storage.contextImages.set(context.id, contextImages);
       }
 
-      return { ...message, images };
+      return { ...message, images, attachedImages };
     },
   },
 

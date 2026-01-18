@@ -22,12 +22,15 @@ import {
   Maximize2,
   Minimize2,
   Paperclip,
+  User,
+  Bot,
 } from "lucide-react";
 import { mockApi } from "@/lib/mockApi";
 import type {
   VideoWithDetails,
   ContextWithImages,
   Image as ImageType,
+  MessageWithImages,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +57,11 @@ export default function VideoEditorPage() {
   const [useContext, setUseContext] = useState(false);
   const [attachedImages, setAttachedImages] = useState<ImageType[]>([]);
 
+  // Context generation
+  const [contextPrompt, setContextPrompt] = useState("");
+  const [generatingContext, setGeneratingContext] = useState(false);
+  const [contextAttachedImages, setContextAttachedImages] = useState<ImageType[]>([]);
+
   // Context editing
   const [contextContent, setContextContent] = useState("");
   const [savingContext, setSavingContext] = useState(false);
@@ -65,13 +73,24 @@ export default function VideoEditorPage() {
   // Fullscreen image viewer
   const [fullscreenImage, setFullscreenImage] = useState<ImageType | null>(null);
 
+  // Image picker modal
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [imagePickerTarget, setImagePickerTarget] = useState<"frame" | "context">("frame");
+
+  // Chat scroll ref
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   // Upload refs
   const frameUploadRef = useRef<HTMLInputElement>(null);
-  const attachUploadRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadVideo();
   }, [videoId]);
+
+  useEffect(() => {
+    // Scroll to bottom of chat when messages change
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [video, selectedFrameId]);
 
   async function loadVideo() {
     setLoading(true);
@@ -109,10 +128,22 @@ export default function VideoEditorPage() {
   async function handleGenerate() {
     if (!prompt.trim() || !selectedFrameId) return;
     setGenerating(true);
-    await mockApi.generate.images(selectedFrameId, prompt.trim(), useContext);
+    const attachedImageIds = attachedImages.map((img) => img.id);
+    await mockApi.generate.images(selectedFrameId, prompt.trim(), useContext, attachedImageIds);
     setPrompt("");
     setAttachedImages([]);
     setGenerating(false);
+    loadVideo();
+  }
+
+  async function handleGenerateContext() {
+    if (!contextPrompt.trim() || !context) return;
+    setGeneratingContext(true);
+    const attachedImageIds = contextAttachedImages.map((img) => img.id);
+    await mockApi.generate.contextImages(context.id, contextPrompt.trim(), attachedImageIds);
+    setContextPrompt("");
+    setContextAttachedImages([]);
+    setGeneratingContext(false);
     loadVideo();
   }
 
@@ -162,23 +193,37 @@ export default function VideoEditorPage() {
     loadVideo();
   }
 
-  function handleAttachImage() {
-    const seed = `attach-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const fakeImage: ImageType = {
-      id: `temp-${seed}`,
-      url: `https://picsum.photos/seed/${seed}/400/300`,
-      cloudinaryId: `temp-${seed}`,
-      messageId: null,
-      createdAt: new Date(),
-    };
-    setAttachedImages((prev) => [...prev, fakeImage]);
+  function openImagePicker(target: "frame" | "context") {
+    setImagePickerTarget(target);
+    setImagePickerOpen(true);
+  }
+
+  function handleSelectFromPicker(image: ImageType) {
+    if (imagePickerTarget === "frame") {
+      if (!attachedImages.find((img) => img.id === image.id)) {
+        setAttachedImages((prev) => [...prev, image]);
+      }
+    } else {
+      if (!contextAttachedImages.find((img) => img.id === image.id)) {
+        setContextAttachedImages((prev) => [...prev, image]);
+      }
+    }
   }
 
   function removeAttachedImage(imageId: string) {
     setAttachedImages((prev) => prev.filter((img) => img.id !== imageId));
   }
 
+  function removeContextAttachedImage(imageId: string) {
+    setContextAttachedImages((prev) => prev.filter((img) => img.id !== imageId));
+  }
+
   const selectedFrame = video?.frames.find((f) => f.id === selectedFrameId);
+
+  // Get available images for picker
+  const availableImages = imagePickerTarget === "frame"
+    ? selectedFrame?.images || []
+    : context?.images || [];
 
   if (loading) {
     return (
@@ -225,6 +270,61 @@ export default function VideoEditorPage() {
             >
               <X className="w-4 h-4" />
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Image Picker Modal */}
+      {imagePickerOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-8">
+          <div className="bg-white dark:bg-zinc-950 rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="font-semibold">Select Reference Image</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setImagePickerOpen(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="flex-1 p-4 overflow-auto">
+              {availableImages.length === 0 ? (
+                <p className="text-center text-zinc-500 py-8">
+                  No images available. Generate some first!
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  {availableImages.map((img) => {
+                    const isSelected = imagePickerTarget === "frame"
+                      ? attachedImages.some((a) => a.id === img.id)
+                      : contextAttachedImages.some((a) => a.id === img.id);
+                    return (
+                      <div
+                        key={img.id}
+                        className={cn(
+                          "relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
+                          isSelected
+                            ? "border-blue-500 ring-2 ring-blue-500/20"
+                            : "border-transparent hover:border-zinc-300"
+                        )}
+                        onClick={() => handleSelectFromPicker(img)}
+                      >
+                        <Image src={img.url} alt="" fill className="object-cover" />
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1">
+                            <Check className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
+              <Button onClick={() => setImagePickerOpen(false)}>Done</Button>
+            </div>
           </div>
         </div>
       )}
@@ -321,7 +421,7 @@ export default function VideoEditorPage() {
                   />
                   Use context
                 </label>
-                <Button variant="outline" size="sm" onClick={handleAttachImage}>
+                <Button variant="outline" size="sm" onClick={() => openImagePicker("frame")}>
                   <Paperclip className="w-4 h-4" />
                   Attach Image
                 </Button>
@@ -454,7 +554,7 @@ export default function VideoEditorPage() {
                         {index + 1}. {frame.title}
                       </p>
                       <p className="text-xs text-zinc-400">
-                        {frame.images.length} images
+                        {frame.messages.length} prompts
                         {frame.selectedImage && (
                           <span className="text-green-600"> • selected</span>
                         )}
@@ -512,6 +612,11 @@ export default function VideoEditorPage() {
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 <span className="text-sm font-medium">Context</span>
+                {context && context.messages.length > 0 && (
+                  <span className="text-xs bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 rounded">
+                    {context.messages.length}
+                  </span>
+                )}
               </div>
               {contextExpanded ? (
                 <ChevronDown className="w-4 h-4" />
@@ -520,13 +625,14 @@ export default function VideoEditorPage() {
               )}
             </button>
             {contextExpanded && (
-              <div className="p-3 pt-0 space-y-2">
+              <div className="p-3 pt-0 space-y-2 max-h-96 overflow-y-auto">
+                {/* Context text */}
                 <div className="relative">
                   <Textarea
                     placeholder="Add context for image generation..."
                     value={contextContent}
                     onChange={(e) => setContextContent(e.target.value)}
-                    className="text-sm min-h-[100px] pr-8"
+                    className="text-sm min-h-[60px] pr-8"
                   />
                   <Button
                     variant="ghost"
@@ -546,35 +652,108 @@ export default function VideoEditorPage() {
                   {savingContext && <Loader2 className="w-4 h-4 animate-spin" />}
                   Save Context
                 </Button>
-                {context && context.images.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs text-zinc-500 mb-1">
-                      Reference images ({context.images.length})
-                    </p>
-                    <div className="grid grid-cols-3 gap-1">
-                      {context.images.slice(0, 6).map((img) => (
-                        <div
-                          key={img.id}
-                          className="relative aspect-video rounded overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500"
-                          onClick={() => setFullscreenImage(img)}
-                        >
-                          <Image
-                            src={img.url}
-                            alt=""
-                            fill
-                            className="object-cover"
-                          />
+
+                {/* Context chat history */}
+                {context && context.messages.length > 0 && (
+                  <div className="mt-3 space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-3">
+                    <p className="text-xs font-medium text-zinc-500">Chat History</p>
+                    {context.messages.map((msg) => (
+                      <div key={msg.id} className="space-y-2">
+                        {/* User prompt */}
+                        <div className="flex gap-2">
+                          <User className="w-4 h-4 text-zinc-400 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400">{msg.prompt}</p>
+                            {msg.attachedImages && msg.attachedImages.length > 0 && (
+                              <div className="flex gap-1 mt-1 flex-wrap">
+                                {msg.attachedImages.map((img) => (
+                                  <div
+                                    key={img.id}
+                                    className="w-8 h-6 rounded overflow-hidden cursor-pointer"
+                                    onClick={() => setFullscreenImage(img)}
+                                  >
+                                    <Image src={img.url} alt="" width={32} height={24} className="w-full h-full object-cover" />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Generated images */}
+                        <div className="flex gap-2">
+                          <Bot className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                          <div className="grid grid-cols-4 gap-1 flex-1">
+                            {msg.images.map((img) => (
+                              <div
+                                key={img.id}
+                                className="aspect-video rounded overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500"
+                                onClick={() => setFullscreenImage(img)}
+                              >
+                                <Image src={img.url} alt="" width={80} height={45} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Context generation input */}
+                <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2 space-y-2">
+                  {contextAttachedImages.length > 0 && (
+                    <div className="flex gap-1 flex-wrap">
+                      {contextAttachedImages.map((img) => (
+                        <div key={img.id} className="relative w-10 h-7 rounded overflow-hidden group">
+                          <Image src={img.url} alt="" fill className="object-cover" />
+                          <button
+                            className="absolute top-0 right-0 bg-red-500 text-white p-0.5 opacity-0 group-hover:opacity-100"
+                            onClick={() => removeContextAttachedImage(img.id)}
+                          >
+                            <X className="w-2 h-2" />
+                          </button>
                         </div>
                       ))}
                     </div>
+                  )}
+                  <div className="flex gap-1">
+                    <Input
+                      placeholder="Generate context images..."
+                      value={contextPrompt}
+                      onChange={(e) => setContextPrompt(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleGenerateContext()}
+                      disabled={generatingContext}
+                      className="h-7 text-xs"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => openImagePicker("context")}
+                      disabled={!context?.images.length}
+                    >
+                      <Paperclip className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={handleGenerateContext}
+                      disabled={!contextPrompt.trim() || generatingContext}
+                    >
+                      {generatingContext ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Send className="w-3 h-3" />
+                      )}
+                    </Button>
                   </div>
-                )}
+                </div>
               </div>
             )}
           </div>
         </aside>
 
-        {/* Main content */}
+        {/* Main content - Chat view */}
         <main className="flex-1 flex flex-col bg-zinc-50 dark:bg-zinc-900">
           {selectedFrame ? (
             <>
@@ -584,7 +763,7 @@ export default function VideoEditorPage() {
                   <div>
                     <h2 className="text-lg font-semibold">{selectedFrame.title}</h2>
                     <p className="text-sm text-zinc-500">
-                      {selectedFrame.images.length} images generated
+                      {selectedFrame.messages.length} prompts, {selectedFrame.images.length} images
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -601,82 +780,119 @@ export default function VideoEditorPage() {
                       onClick={() => frameUploadRef.current?.click()}
                     >
                       <Upload className="w-4 h-4" />
-                      Upload Image
+                      Upload
                     </Button>
                   </div>
                 </div>
               </div>
 
-              {/* Images grid */}
+              {/* Chat history */}
               <div className="flex-1 overflow-y-auto p-6">
-                {selectedFrame.images.length === 0 ? (
+                {selectedFrame.messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-zinc-400">
                     <ImageIcon className="w-12 h-12 mb-4" />
-                    <p>No images yet. Generate or upload some!</p>
+                    <p>No images yet. Start by describing what you want!</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {selectedFrame.images.map((image) => (
-                      <div
-                        key={image.id}
-                        className={cn(
-                          "group relative aspect-video rounded-lg overflow-hidden border-2 transition-all cursor-pointer",
-                          selectedFrame.selectedImageId === image.id
-                            ? "border-green-500 ring-2 ring-green-500/20"
-                            : "border-transparent hover:border-zinc-300 dark:hover:border-zinc-700"
-                        )}
-                        onClick={() => setFullscreenImage(image)}
-                      >
-                        <Image
-                          src={image.url}
-                          alt=""
-                          fill
-                          className="object-cover"
-                        />
-                        {selectedFrame.selectedImageId === image.id && (
-                          <div className="absolute top-2 left-2 bg-green-500 text-white rounded-full p-1">
-                            <Check className="w-3 h-3" />
+                  <div className="max-w-4xl mx-auto space-y-6">
+                    {selectedFrame.messages.map((msg) => (
+                      <div key={msg.id} className="space-y-3">
+                        {/* User message */}
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center flex-shrink-0">
+                            <User className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
                           </div>
-                        )}
-                        <div
-                          className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() =>
-                              handleSelectImage(selectedFrame.id, image.id)
-                            }
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <Check className="w-4 h-4" />
-                            Select
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleCopyToGallery(image.id)}
-                            className="bg-white/90"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() =>
-                              handleRemoveImage(
-                                image.id,
-                                "frame",
-                                selectedFrame.id
-                              )
-                            }
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">You</p>
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{msg.prompt}</p>
+                            {msg.withContext && (
+                              <span className="inline-block mt-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
+                                with context
+                              </span>
+                            )}
+                            {msg.attachedImages && msg.attachedImages.length > 0 && (
+                              <div className="flex gap-2 mt-2 flex-wrap">
+                                {msg.attachedImages.map((img) => (
+                                  <div
+                                    key={img.id}
+                                    className="w-16 h-12 rounded overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500"
+                                    onClick={() => setFullscreenImage(img)}
+                                  >
+                                    <Image src={img.url} alt="" width={64} height={48} className="w-full h-full object-cover" />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* AI response - Generated images */}
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                            <Bot className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Generated</p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+                              {msg.images.map((image) => (
+                                <div
+                                  key={image.id}
+                                  className={cn(
+                                    "group relative aspect-video rounded-lg overflow-hidden border-2 transition-all cursor-pointer",
+                                    selectedFrame.selectedImageId === image.id
+                                      ? "border-green-500 ring-2 ring-green-500/20"
+                                      : "border-transparent hover:border-zinc-300 dark:hover:border-zinc-700"
+                                  )}
+                                  onClick={() => setFullscreenImage(image)}
+                                >
+                                  <Image
+                                    src={image.url}
+                                    alt=""
+                                    fill
+                                    className="object-cover"
+                                  />
+                                  {selectedFrame.selectedImageId === image.id && (
+                                    <div className="absolute top-2 left-2 bg-green-500 text-white rounded-full p-1">
+                                      <Check className="w-3 h-3" />
+                                    </div>
+                                  )}
+                                  <div
+                                    className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => handleSelectImage(selectedFrame.id, image.id)}
+                                      className="bg-green-600 hover:bg-green-700 h-7 px-2 text-xs"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleCopyToGallery(image.id)}
+                                      className="bg-white/90 h-7 px-2"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleRemoveImage(image.id, "frame", selectedFrame.id)}
+                                      className="h-7 px-2"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
+                    <div ref={chatEndRef} />
                   </div>
                 )}
               </div>
@@ -732,18 +948,12 @@ export default function VideoEditorPage() {
                         </label>
                       </div>
                     </div>
-                    <input
-                      type="file"
-                      ref={attachUploadRef}
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleAttachImage}
-                    />
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => attachUploadRef.current?.click()}
+                      onClick={() => openImagePicker("frame")}
                       title="Attach reference image"
+                      disabled={!selectedFrame.images.length}
                     >
                       <Paperclip className="w-4 h-4" />
                     </Button>
@@ -760,7 +970,7 @@ export default function VideoEditorPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-zinc-400 mt-2">
-                    Press Enter to generate 4 images. Click any image to view fullscreen.
+                    Press Enter to generate 4 images. Click paperclip to attach reference images from this frame.
                   </p>
                 </div>
               </div>

@@ -39,6 +39,7 @@ export interface Message {
   withContext: boolean;
   frameId: string | null;
   contextId: string | null;
+  attachedImageIds: string[]; // Images attached as reference to the prompt
   createdAt: Date;
 }
 
@@ -68,7 +69,8 @@ export interface FrameWithImages extends Frame {
 }
 
 export interface MessageWithImages extends Message {
-  images: Image[];
+  images: Image[]; // Generated images
+  attachedImages: Image[]; // Reference images attached to the prompt
 }
 
 export interface ContextWithImages extends Context {
