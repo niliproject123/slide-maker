@@ -6,91 +6,30 @@
 
 **Base URL:** `https://api.your-domain.com` or `http://localhost:4000`
 
-**Auth:** JWT Bearer token in Authorization header
+**Auth:** Disabled for initial development (will be added later)
 
 ---
 
-## Authentication
+## Authentication (DISABLED)
 
+> **Note:** Authentication is disabled for initial development. All endpoints are publicly accessible. User authentication will be added in a later phase.
+
+<!--
 ### POST /auth/signup
-
-Create new user account.
-
-```
-Request:
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-
-Response 201:
-{
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "createdAt": "2024-01-15T10:00:00Z"
-  }
-}
-
-Errors:
-400 - Invalid email or password too short
-409 - Email already exists
-```
-
 ### POST /auth/login
-
-Login existing user.
-
-```
-Request:
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-
-Response 200:
-{
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "createdAt": "2024-01-15T10:00:00Z"
-  }
-}
-
-Errors:
-401 - Invalid credentials
-```
-
 ### GET /auth/me
-
-Get current user info. **Requires auth.**
-
-```
-Headers:
-Authorization: Bearer <token>
-
-Response 200:
-{
-  "id": "uuid",
-  "email": "user@example.com",
-  "createdAt": "2024-01-15T10:00:00Z"
-}
-
-Errors:
-401 - Invalid or expired token
-```
+These endpoints will be implemented when auth is enabled.
+-->
 
 ---
 
 ## Projects
 
-All endpoints require authentication.
+No authentication required (auth disabled).
 
 ### GET /projects
 
-Get all projects for current user.
+Get all projects.
 
 ```
 Response 200:
@@ -152,7 +91,6 @@ Response 200:
 
 Errors:
 404 - Project not found
-403 - Not your project
 ```
 
 ### PUT /projects/:id
@@ -390,26 +328,23 @@ Response 200:
 }
 
 Errors:
-400 - Image not in this frame
+400 - Image not found
 ```
 
 ### DELETE /frames/:id
 
-Delete frame and all images.
+Delete frame (removes images from this frame's relation).
 
 ```
 Response 200:
 {
-  "success": true,
-  "deleted": {
-    "images": 8
-  }
+  "success": true
 }
 ```
 
 ### DELETE /frames/:id/history
 
-Clear frame history (delete all messages and images).
+Clear frame history (delete all messages and their images).
 
 ```
 Response 200:
@@ -437,8 +372,8 @@ Response 200:
   "videoId": "uuid",
   "content": "Pixar animation style, vibrant colors",
   "images": [
-    { 
-      "id": "uuid", 
+    {
+      "id": "uuid",
       "url": "https://cloudinary.com/...",
       "cloudinaryId": "video-frames/abc123"
     }
@@ -486,24 +421,12 @@ Response 201:
 {
   "id": "uuid",
   "url": "https://cloudinary.com/...",
-  "cloudinaryId": "video-frames/abc123",
-  "contextId": "uuid"
+  "cloudinaryId": "video-frames/abc123"
 }
 
 Errors:
 400 - No file uploaded or invalid format
 413 - File too large (max 10MB)
-```
-
-### DELETE /context/images/:id
-
-Delete context image.
-
-```
-Response 200:
-{
-  "success": true
-}
 ```
 
 ### DELETE /videos/:videoId/context/history
@@ -593,8 +516,7 @@ Response 201:
 {
   "id": "uuid",
   "url": "https://cloudinary.com/...",
-  "cloudinaryId": "video-frames/abc123",
-  "frameId": "uuid"
+  "cloudinaryId": "video-frames/abc123"
 }
 
 Errors:
@@ -637,7 +559,7 @@ Response 200:
 
 ### GET /projects/:projectId/gallery
 
-Get gallery images (moved from other projects).
+Get gallery images.
 
 ```
 Response 200:
@@ -652,7 +574,7 @@ Response 200:
 
 ### DELETE /images/:id
 
-Delete single image.
+Fully delete an image (removes from Cloudinary and all relations).
 
 ```
 Response 200:
@@ -661,48 +583,17 @@ Response 200:
 }
 ```
 
-### POST /images/:id/move
+### POST /images/:id/copy
 
-Move image to another frame or project.
+Copy image to another location. **Adds the same image to a new relation (N:M).**
 
-```
-Request (move within project):
-{
-  "targetType": "frame",
-  "targetFrameId": "uuid"
-}
-
-Request (move to another project - gallery):
-{
-  "targetType": "gallery",
-  "targetProjectId": "uuid"
-}
-
-Request (move to another project - specific frame):
-{
-  "targetType": "frame",
-  "targetProjectId": "uuid",
-  "targetFrameId": "uuid"
-}
-
-Response 200:
-{
-  "success": true,
-  "newLocation": {
-    "projectId": "uuid",
-    "frameId": "uuid" | null
-  }
-}
-```
-
-### POST /gallery/:id/assign
-
-Assign gallery image to a frame.
+Image stays in original location AND is added to target.
 
 ```
 Request:
 {
-  "frameId": "uuid"
+  "targetType": "frame" | "context" | "gallery",
+  "targetId": "uuid"  // frameId, contextId, or projectId
 }
 
 Response 200:
@@ -710,16 +601,66 @@ Response 200:
   "success": true,
   "image": {
     "id": "uuid",
-    "url": "...",
-    "frameId": "uuid"
+    "url": "..."
   }
+}
+```
+
+**Example:** Copy image from context to frame
+- Before: Image in Context A
+- After: Image in Context A AND Frame B
+
+### POST /images/:id/move
+
+Move image to another location. **Removes from source, adds to target.**
+
+```
+Request:
+{
+  "sourceType": "frame" | "context" | "gallery",
+  "sourceId": "uuid",
+  "targetType": "frame" | "context" | "gallery",
+  "targetId": "uuid"
+}
+
+Response 200:
+{
+  "success": true,
+  "image": {
+    "id": "uuid",
+    "url": "..."
+  }
+}
+```
+
+**Example:** Move image from Frame A to Frame B
+- Before: Image in Frame A
+- After: Image in Frame B only
+
+### POST /images/:id/remove
+
+Remove image from a specific relation (doesn't delete the image).
+
+```
+Request:
+{
+  "sourceType": "frame" | "context" | "gallery",
+  "sourceId": "uuid"
+}
+
+Response 200:
+{
+  "success": true
 }
 ```
 
 ---
 
-## Export
+## Export (DISABLED)
 
+> **Note:** Video export is disabled for initial development. Will be implemented in a later phase.
+
+<!--
 ### POST /videos/:id/export
 
 Generate video from selected frame images.
@@ -734,6 +675,7 @@ Errors:
 400 - No frames with selected images
 500 - Cloudinary error
 ```
+-->
 
 ---
 
@@ -751,7 +693,7 @@ All errors follow this format:
 
 Common HTTP status codes:
 - 400 - Bad request (validation error)
-- 401 - Unauthorized (no/invalid token)
-- 403 - Forbidden (not your resource)
 - 404 - Not found
 - 500 - Server error
+
+Note: 401/403 errors will be added when authentication is enabled.

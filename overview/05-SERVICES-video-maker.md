@@ -5,7 +5,9 @@
 | Service | Purpose | Pricing |
 |---------|---------|---------|
 | Image Generation | AI image creation | See comparison below |
-| Cloudinary | Image storage + Video creation | Free tier (25GB) |
+| Storage | Image storage + delivery | Cloudinary free tier (25GB) |
+
+**Architecture:** Both services use abstraction layers for easy swapping.
 
 ---
 
@@ -59,8 +61,8 @@ export interface ImageGenerationOptions {
 }
 
 export interface ImageGenerationResult {
-  url: string;          // Cloudinary URL (permanent)
-  cloudinaryId: string; // For deletion/video export
+  url: string;          // Permanent URL from storage provider
+  storageId: string;    // Provider-specific ID (for deletion)
   provider: string;
   model: string;
 }
@@ -139,7 +141,7 @@ export async function generateImagesWithContext(
 
 ### OpenAI Provider
 
-**Important:** GPT Image models (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`) return **base64** only, not URLs. We must upload to Cloudinary to get permanent URLs.
+**Important:** GPT Image models (`gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5`) return **base64** only, not URLs. We must upload to storage to get permanent URLs.
 
 DALL-E models are deprecated (May 2026), so we use GPT Image as default.
 
@@ -148,7 +150,7 @@ DALL-E models are deprecated (May 2026), so we use GPT Image as default.
 
 import OpenAI from 'openai';
 import { ImageGenerationProvider, ImageGenerationOptions, ImageGenerationResult } from '../types';
-import { uploadBase64ToCloudinary } from '../../cloudinary';
+import { getStorage } from '../../storage';
 import { env } from '../../../config/env';
 
 type OpenAIModel = 'gpt-image-1' | 'gpt-image-1-mini' | 'gpt-image-1.5' | 'dall-e-3' | 'dall-e-2';
@@ -189,16 +191,17 @@ export class OpenAIProvider implements ImageGenerationProvider {
         // GPT Image always returns base64, no response_format needed
       });
 
-      // Upload each base64 image to Cloudinary
+      // Upload each base64 image to storage
+      const storage = getStorage();
       const uploadPromises = response.data.map(async (item) => {
         const base64 = item.b64_json;
         if (!base64) throw new Error('No base64 data returned');
-        
-        const { url, cloudinaryId } = await uploadBase64ToCloudinary(base64);
-        
+
+        const result = await storage.uploadBase64(base64, { folder: 'video-frames/generated' });
+
         return {
-          url,
-          cloudinaryId,
+          url: result.url,
+          storageId: result.storageId,
           provider: this.name,
           model: this.model,
         };
@@ -531,7 +534,297 @@ IMAGE_PROVIDER=stability
 
 ---
 
-## Cloudinary
+## Storage - Abstraction Layer
+
+### Interface Definition
+
+```typescript
+// src/services/storage/types.ts
+
+export interface UploadOptions {
+  folder?: string;
+  publicId?: string;  // Optional custom ID
+}
+
+export interface StorageResult {
+  url: string;         // Public URL for the image
+  storageId: string;   // Provider-specific ID (for deletion)
+  provider: string;    // 'cloudinary', 's3', etc.
+}
+
+export interface StorageProvider {
+  name: string;
+
+  // Upload from base64 data
+  uploadBase64(base64Data: string, options?: UploadOptions): Promise<StorageResult>;
+
+  // Upload from URL (fetch and store)
+  uploadFromUrl(sourceUrl: string, options?: UploadOptions): Promise<StorageResult>;
+
+  // Upload from file buffer
+  uploadBuffer(buffer: Buffer, mimeType: string, options?: UploadOptions): Promise<StorageResult>;
+
+  // Delete single image
+  delete(storageId: string): Promise<void>;
+
+  // Delete multiple images
+  deleteMany(storageIds: string[]): Promise<void>;
+
+  // Get public URL (if different from stored URL)
+  getUrl(storageId: string): string;
+}
+```
+
+### Provider Factory
+
+```typescript
+// src/services/storage/index.ts
+
+import { StorageProvider } from './types';
+import { CloudinaryStorage } from './providers/cloudinary';
+// Future: import { S3Storage } from './providers/s3';
+// Future: import { FirebaseStorage } from './providers/firebase';
+
+export type StorageProviderName = 'cloudinary' | 's3' | 'firebase';
+
+const providers: Record<StorageProviderName, () => StorageProvider> = {
+  'cloudinary': () => new CloudinaryStorage(),
+  // 's3': () => new S3Storage(),
+  // 'firebase': () => new FirebaseStorage(),
+};
+
+const currentProvider: StorageProviderName =
+  (process.env.STORAGE_PROVIDER as StorageProviderName) || 'cloudinary';
+
+let storageInstance: StorageProvider | null = null;
+
+export function getStorageProvider(name?: StorageProviderName): StorageProvider {
+  const providerName = name || currentProvider;
+  const factory = providers[providerName];
+
+  if (!factory) {
+    throw new Error(`Unknown storage provider: ${providerName}`);
+  }
+
+  return factory();
+}
+
+// Singleton for default provider
+export function getStorage(): StorageProvider {
+  if (!storageInstance) {
+    storageInstance = getStorageProvider();
+  }
+  return storageInstance;
+}
+
+// Re-export types
+export * from './types';
+```
+
+### Cloudinary Implementation
+
+```typescript
+// src/services/storage/providers/cloudinary.ts
+
+import { v2 as cloudinary } from 'cloudinary';
+import { StorageProvider, StorageResult, UploadOptions } from '../types';
+import { env } from '../../../config/env';
+
+cloudinary.config({
+  cloud_name: env.CLOUDINARY_CLOUD_NAME,
+  api_key: env.CLOUDINARY_API_KEY,
+  api_secret: env.CLOUDINARY_API_SECRET,
+});
+
+export class CloudinaryStorage implements StorageProvider {
+  name = 'cloudinary';
+
+  async uploadBase64(base64Data: string, options: UploadOptions = {}): Promise<StorageResult> {
+    const { folder = 'video-frames', publicId } = options;
+
+    const result = await cloudinary.uploader.upload(
+      `data:image/png;base64,${base64Data}`,
+      {
+        folder,
+        public_id: publicId,
+        resource_type: 'image',
+      }
+    );
+
+    return {
+      url: result.secure_url,
+      storageId: result.public_id,
+      provider: this.name,
+    };
+  }
+
+  async uploadFromUrl(sourceUrl: string, options: UploadOptions = {}): Promise<StorageResult> {
+    const { folder = 'video-frames', publicId } = options;
+
+    const result = await cloudinary.uploader.upload(sourceUrl, {
+      folder,
+      public_id: publicId,
+      resource_type: 'image',
+    });
+
+    return {
+      url: result.secure_url,
+      storageId: result.public_id,
+      provider: this.name,
+    };
+  }
+
+  async uploadBuffer(buffer: Buffer, mimeType: string, options: UploadOptions = {}): Promise<StorageResult> {
+    const { folder = 'video-frames', publicId } = options;
+    const base64 = buffer.toString('base64');
+    const dataUri = `data:${mimeType};base64,${base64}`;
+
+    const result = await cloudinary.uploader.upload(dataUri, {
+      folder,
+      public_id: publicId,
+      resource_type: 'image',
+    });
+
+    return {
+      url: result.secure_url,
+      storageId: result.public_id,
+      provider: this.name,
+    };
+  }
+
+  async delete(storageId: string): Promise<void> {
+    await cloudinary.uploader.destroy(storageId);
+  }
+
+  async deleteMany(storageIds: string[]): Promise<void> {
+    // Cloudinary limit: 100 per batch
+    const batches = this.chunk(storageIds, 100);
+
+    for (const batch of batches) {
+      await cloudinary.api.delete_resources(batch);
+    }
+  }
+
+  getUrl(storageId: string): string {
+    return cloudinary.url(storageId, { secure: true });
+  }
+
+  private chunk<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+  }
+}
+```
+
+### Future: S3 Implementation (Template)
+
+```typescript
+// src/services/storage/providers/s3.ts (future)
+
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { StorageProvider, StorageResult, UploadOptions } from '../types';
+
+export class S3Storage implements StorageProvider {
+  name = 's3';
+  private client: S3Client;
+  private bucket: string;
+  private cdnUrl: string;
+
+  constructor() {
+    this.client = new S3Client({ region: process.env.AWS_REGION });
+    this.bucket = process.env.S3_BUCKET!;
+    this.cdnUrl = process.env.S3_CDN_URL || `https://${this.bucket}.s3.amazonaws.com`;
+  }
+
+  async uploadBase64(base64Data: string, options: UploadOptions = {}): Promise<StorageResult> {
+    const buffer = Buffer.from(base64Data, 'base64');
+    return this.uploadBuffer(buffer, 'image/png', options);
+  }
+
+  async uploadFromUrl(sourceUrl: string, options: UploadOptions = {}): Promise<StorageResult> {
+    const response = await fetch(sourceUrl);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get('content-type') || 'image/png';
+    return this.uploadBuffer(buffer, contentType, options);
+  }
+
+  async uploadBuffer(buffer: Buffer, mimeType: string, options: UploadOptions = {}): Promise<StorageResult> {
+    const { folder = 'video-frames', publicId } = options;
+    const key = publicId || `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    await this.client.send(new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: buffer,
+      ContentType: mimeType,
+    }));
+
+    return {
+      url: `${this.cdnUrl}/${key}`,
+      storageId: key,
+      provider: this.name,
+    };
+  }
+
+  async delete(storageId: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({
+      Bucket: this.bucket,
+      Key: storageId,
+    }));
+  }
+
+  async deleteMany(storageIds: string[]): Promise<void> {
+    // S3 supports batch delete up to 1000
+    await Promise.all(storageIds.map(id => this.delete(id)));
+  }
+
+  getUrl(storageId: string): string {
+    return `${this.cdnUrl}/${storageId}`;
+  }
+}
+```
+
+### Usage Example
+
+```typescript
+// In route handlers or services
+import { getStorage } from '../services/storage';
+
+// Upload generated image (base64 from GPT Image)
+const storage = getStorage();
+const result = await storage.uploadBase64(base64Data, { folder: 'video-frames/generated' });
+// result.url = "https://res.cloudinary.com/xxx/video-frames/generated/abc123.png"
+// result.storageId = "video-frames/generated/abc123"
+
+// Delete image
+await storage.delete(result.storageId);
+
+// Batch delete
+await storage.deleteMany(['id1', 'id2', 'id3']);
+```
+
+### Switching Providers
+
+```bash
+# Use Cloudinary (default)
+STORAGE_PROVIDER=cloudinary
+
+# Use S3 (future)
+STORAGE_PROVIDER=s3
+AWS_REGION=us-east-1
+S3_BUCKET=my-video-frames
+S3_CDN_URL=https://cdn.example.com  # Optional CloudFront URL
+```
+
+---
+
+## Cloudinary-Specific Features
+
+> **Note:** These features are Cloudinary-specific and NOT part of the abstraction layer.
+> If switching storage providers, video export will need a different solution.
 
 ### Setup
 
@@ -745,67 +1038,52 @@ export async function exportVideo(videoId: string): Promise<string> {
 // src/routes/frames.ts - generate endpoint
 
 import { generateImages } from '../services/image-generation';
-import { uploadFromUrl } from '../services/cloudinary.service';
 import { prisma } from '../plugins/prisma';
 
 fastify.post('/:frameId/generate', async (request, reply) => {
   const { frameId } = request.params;
   const { prompt, withContext } = request.body;
-  const userId = request.user.id;
 
-  // 1. Verify frame ownership
+  // 1. Get frame with context
   const frame = await prisma.frame.findUnique({
     where: { id: frameId },
     include: {
       video: {
         include: {
-          project: true,
-          context: {
-            include: {
-              messages: {
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-              },
-            },
-          },
+          context: true,
         },
       },
     },
   });
 
-  if (!frame || frame.video.project.userId !== userId) {
+  if (!frame) {
     return reply.status(404).send({ error: 'Frame not found' });
   }
 
   // 2. Build full prompt (with context if requested)
   let fullPrompt = prompt;
-  if (withContext && frame.video.context?.messages[0]) {
-    const contextText = frame.video.context.messages[0].prompt;
-    fullPrompt = `${contextText}. ${prompt}`;
+  if (withContext && frame.video.context?.content) {
+    fullPrompt = `${frame.video.context.content}. ${prompt}`;
   }
 
-  // 3. Generate images (uses provider from env)
-  const generatedImages = await generateImages({ 
-    prompt: fullPrompt, 
+  // 3. Generate images (uploads to storage automatically)
+  const generatedImages = await generateImages({
+    prompt: fullPrompt,
     count: 4,
     width: 1792,
     height: 1024,
   });
 
-  // 4. Upload to Cloudinary (parallel)
-  const uploadPromises = generatedImages.map((img) => uploadFromUrl(img.url));
-  const uploadResults = await Promise.all(uploadPromises);
-
-  // 5. Save to database
+  // 4. Save to database (images already uploaded by provider)
   const message = await prisma.message.create({
     data: {
       prompt,
       withContext,
       frameId,
       images: {
-        create: uploadResults.map((result) => ({
-          url: result.url,
-          cloudinaryId: result.publicId,
+        create: generatedImages.map((img) => ({
+          url: img.url,
+          storageId: img.storageId,
         })),
       },
     },
