@@ -119,14 +119,14 @@ model Context {
 }
 
 model ContextImage {
-  id           String   @id @default(uuid())
-  url          String
-  cloudinaryId String
-  contextId    String
-  createdAt    DateTime @default(now())
-  
+  id        String   @id @default(uuid())
+  url       String
+  storageId String   // Provider-agnostic storage ID
+  contextId String
+  createdAt DateTime @default(now())
+
   context Context @relation(fields: [contextId], references: [id], onDelete: Cascade)
-  
+
   @@index([contextId])
 }
 
@@ -168,7 +168,7 @@ model Message {
 model Image {
   id               String   @id @default(uuid())
   url              String
-  cloudinaryId     String
+  storageId        String   // Provider-agnostic storage ID (was cloudinaryId)
   messageId        String?  // Set if generated via message
   frameId          String?  // Set if uploaded directly to frame
   galleryProjectId String?  // Set if moved to another project's gallery

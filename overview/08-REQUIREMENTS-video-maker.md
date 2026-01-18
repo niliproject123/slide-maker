@@ -10,8 +10,8 @@
 # ============ DATABASE ============
 DATABASE_URL=postgresql://user:password@localhost:5432/video_frames_editor
 
-# ============ AUTH ============
-JWT_SECRET=your-super-secret-key-min-32-characters-long
+# ============ AUTH (DISABLED) ============
+# JWT_SECRET=your-super-secret-key-min-32-characters-long  # Uncomment when auth is enabled
 
 # ============ IMAGE GENERATION ============
 # Choose provider: openai-gpt-image (default), openai, replicate-flux, replicate-sdxl, stability
@@ -26,10 +26,19 @@ REPLICATE_API_TOKEN=r8_...
 # Stability (required if IMAGE_PROVIDER is 'stability')
 STABILITY_API_KEY=sk-...
 
-# ============ CLOUDINARY ============
+# ============ STORAGE ============
+# Choose provider: cloudinary (default), s3, firebase
+STORAGE_PROVIDER=cloudinary
+
+# Cloudinary (required if STORAGE_PROVIDER is 'cloudinary')
 CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=123456789012345
 CLOUDINARY_API_SECRET=your-api-secret
+
+# S3 (required if STORAGE_PROVIDER is 's3') - future
+# AWS_REGION=us-east-1
+# S3_BUCKET=my-video-frames
+# S3_CDN_URL=https://cdn.example.com
 
 # ============ ANTHROPIC (for testing) ============
 ANTHROPIC_API_KEY=sk-ant-...
@@ -100,12 +109,12 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 |---------|---------|
 | `fastify` | Web framework |
 | `@fastify/cors` | CORS handling |
-| `@fastify/jwt` | JWT authentication |
+| `@fastify/jwt` | JWT authentication (disabled for now) |
 | `@prisma/client` | Database ORM |
-| `bcrypt` | Password hashing |
-| `cloudinary` | Image/video storage |
-| `openai` | OpenAI DALL-E / GPT-Image |
-| `replicate` | Replicate (FLUX, SDXL) |
+| `bcrypt` | Password hashing (disabled for now) |
+| `cloudinary` | Image storage (via StorageProvider abstraction) |
+| `openai` | OpenAI GPT-Image (via ImageGenerationProvider abstraction) |
+| `replicate` | Replicate FLUX/SDXL (via ImageGenerationProvider abstraction) |
 | `zod` | Schema validation |
 | `@anthropic-ai/sdk` | Image evaluation (dev) |
 

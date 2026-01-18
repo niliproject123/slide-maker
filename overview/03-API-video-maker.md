@@ -378,7 +378,7 @@ Response 200:
     { 
       "id": "uuid", 
       "url": "https://cloudinary.com/...",
-      "cloudinaryId": "video-frames/abc123"
+      "storageId": "video-frames/abc123"
     }
   ],
   "messages": [
@@ -424,7 +424,7 @@ Response 201:
 {
   "id": "uuid",
   "url": "https://cloudinary.com/...",
-  "cloudinaryId": "video-frames/abc123",
+  "storageId": "video-frames/abc123",
   "contextId": "uuid"
 }
 
@@ -482,10 +482,10 @@ Response 201:
   "withContext": true,
   "createdAt": "2024-01-15T10:00:00Z",
   "images": [
-    { "id": "uuid", "url": "https://cloudinary.com/...", "cloudinaryId": "..." },
-    { "id": "uuid", "url": "https://cloudinary.com/...", "cloudinaryId": "..." },
-    { "id": "uuid", "url": "https://cloudinary.com/...", "cloudinaryId": "..." },
-    { "id": "uuid", "url": "https://cloudinary.com/...", "cloudinaryId": "..." }
+    { "id": "uuid", "url": "https://cloudinary.com/...", "storageId": "..." },
+    { "id": "uuid", "url": "https://cloudinary.com/...", "storageId": "..." },
+    { "id": "uuid", "url": "https://cloudinary.com/...", "storageId": "..." },
+    { "id": "uuid", "url": "https://cloudinary.com/...", "storageId": "..." }
   ]
 }
 
@@ -531,7 +531,7 @@ Response 201:
 {
   "id": "uuid",
   "url": "https://cloudinary.com/...",
-  "cloudinaryId": "video-frames/abc123",
+  "storageId": "video-frames/abc123",
   "frameId": "uuid"
 }
 
@@ -615,7 +615,7 @@ Response 201:
 {
   "id": "uuid",          // New image ID
   "url": "...",
-  "cloudinaryId": "...",
+  "storageId": "...",
   "frameId": "uuid"
 }
 ```
