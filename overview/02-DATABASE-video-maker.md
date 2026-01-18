@@ -26,35 +26,32 @@
      │ 1:1         │ 1:N
      ▼             ▼
 ┌──────────┐  ┌──────────┐
-│ Context  │  │  Frame   │◄─────────┐
-└────┬─────┘  └────┬─────┘          │
-     │             │                │ selectedImage (N:1)
-     ├─────┐       ├─────┐          │
-     │     │       │     │          │
-     │ 1:N │ 1:N   │ 1:N │ 1:N      │
-     ▼     ▼       ▼     ▼          │
-┌───────┐ ┌───────┐ ┌───────┐ ┌─────┴─┐
-│Context│ │Message│ │Message│ │ Image │
-│ Image │ └───┬───┘ └───┬───┘ │(upload)
-└───────┘     │         │     └───────┘
-              │ 1:N     │ 1:N
-              ▼         ▼
-          ┌───────┐ ┌───────┐
-          │ Image │ │ Image │
-          └───────┘ └───────┘
+│ Context  │  │  Frame   │
+└────┬─────┘  └────┬─────┘
+     │             │
+     │ N:M         │ N:M
+     │             │
+     └──────┬──────┘
+            ▼
+       ┌─────────┐
+       │  Image  │◄──── N:M with Project (gallery)
+       └────┬────┘
+            │
+            │ N:1 (source)
+            ▼
+       ┌─────────┐
+       │ Message │
+       └─────────┘
 
-┌──────────┐
-│  Image   │──── can also have galleryProjectId (for images moved from other projects)
-└──────────┘
+Selected Image: Frame.selectedImageId → Image (N:1)
 ```
 
-**Image sources:**
-- Generated via Message (has messageId)
-- Uploaded directly to Frame (has frameId, no messageId)
-- In Gallery (has galleryProjectId - moved from another project)
-- Context images (separate ContextImage model)
-
-**Note:** Same image can be selected by multiple Frames (N:1 relationship).
+**Key design:**
+- Single `Image` model for all use cases
+- Many-to-many: Image can be in multiple Frames, Contexts, and Project galleries
+- Image source is always a Message (1:N) - message creates the images
+- Copy = add same Image to another relation
+- Move = remove from one relation, add to another
 
 ---
 
@@ -89,7 +86,7 @@ model Project {
   updatedAt DateTime @updatedAt
 
   videos        Video[]
-  galleryImages Image[] @relation("GalleryImages")  // Images moved from other projects
+  galleryImages Image[]  // N:M - images in this project's gallery
 }
 
 model Video {
@@ -98,11 +95,11 @@ model Video {
   projectId String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   context Context?
   frames  Frame[]
-  
+
   @@index([projectId])
 }
 
@@ -112,22 +109,10 @@ model Context {
   videoId   String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  video    Video          @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  messages Message[]      // Chat history (optional)
-  images   ContextImage[] // Reference images
-}
 
-model ContextImage {
-  id        String   @id @default(uuid())
-  url       String
-  storageId String   // Provider-agnostic storage ID
-  contextId String
-  createdAt DateTime @default(now())
-
-  context Context @relation(fields: [contextId], references: [id], onDelete: Cascade)
-
-  @@index([contextId])
+  video    Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  messages Message[] // Chat history (optional)
+  images   Image[]   // N:M - reference images
 }
 
 model Frame {
@@ -135,14 +120,14 @@ model Frame {
   title           String
   order           Int
   videoId         String
-  selectedImageId String?  // No @unique - same image can be selected by multiple frames
+  selectedImageId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  video         Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  selectedImage Image?    @relation("SelectedImage", fields: [selectedImageId], references: [id], onDelete: SetNull)
-  messages      Message[] // Generated images come via messages
-  images        Image[]   @relation("FrameImages") // Uploaded images directly on frame
+  video         Video   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  selectedImage Image?  @relation("SelectedImage", fields: [selectedImageId], references: [id], onDelete: SetNull)
+  messages      Message[]
+  images        Image[] // N:M - images in this frame
 
   @@index([videoId])
   @@index([videoId, order])
@@ -156,94 +141,120 @@ model Message {
   frameId     String?
   contextId   String?
   createdAt   DateTime @default(now())
-  
+
   frame   Frame?   @relation(fields: [frameId], references: [id], onDelete: Cascade)
   context Context? @relation(fields: [contextId], references: [id], onDelete: Cascade)
-  images  Image[]  @relation("MessageImages")
-  
+  images  Image[]  // 1:N - message creates images
+
   @@index([frameId])
   @@index([contextId])
 }
 
 model Image {
-  id               String   @id @default(uuid())
-  url              String
-  storageId        String   // Provider-agnostic storage ID (was cloudinaryId)
-  messageId        String?  // Set if generated via message
-  frameId          String?  // Set if uploaded directly to frame
-  galleryProjectId String?  // Set if moved to another project's gallery
-  createdAt        DateTime @default(now())
+  id           String   @id @default(uuid())
+  url          String
+  cloudinaryId String
+  createdAt    DateTime @default(now())
 
-  message        Message? @relation("MessageImages", fields: [messageId], references: [id], onDelete: Cascade)
-  frame          Frame?   @relation("FrameImages", fields: [frameId], references: [id], onDelete: Cascade)
-  galleryProject Project? @relation("GalleryImages", fields: [galleryProjectId], references: [id], onDelete: Cascade)
-  selectedFor    Frame[]  @relation("SelectedImage")  // Can be selected by multiple frames
+  // Source (1:N - message creates the image)
+  messageId String?
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  // Usage (N:M - image can be in multiple places)
+  frames   Frame[]   // Can be in multiple frames
+  contexts Context[] // Can be in multiple contexts
+  projects Project[] // Can be in multiple galleries
+
+  // Selection (N:1 - image can be selected by multiple frames)
+  selectedForFrames Frame[] @relation("SelectedImage")
 
   @@index([messageId])
-  @@index([frameId])
-  @@index([galleryProjectId])
 }
-```
-
----
-
-## Migration Commands
-
-```bash
-# Generate Prisma client
-npx prisma generate
-
-# Create migration
-npx prisma migrate dev --name init
-
-# Apply migrations (production)
-npx prisma migrate deploy
-
-# View database in browser
-npx prisma studio
 ```
 
 ---
 
 ## Key Relationships
 
-| Relation | Type | On Delete |
-|----------|------|-----------|
-| Project → Videos | 1:N | Cascade |
-| Project → GalleryImages | 1:N | Cascade |
-| Video → Context | 1:1 | Cascade |
-| Video → Frames | 1:N | Cascade |
-| Context → ContextImages | 1:N | Cascade |
-| Context → Messages | 1:N | Cascade |
-| Frame → Messages | 1:N | Cascade |
-| Frame → Images (uploaded) | 1:N | Cascade |
-| Message → Images (generated) | 1:N | Cascade |
-| Image → SelectedFor (Frames) | 1:N | SetNull |
+| Relation | Type | Description |
+|----------|------|-------------|
+| Project → Videos | 1:N | Cascade delete |
+| Project ↔ Images | N:M | Gallery images |
+| Video → Context | 1:1 | Cascade delete |
+| Video → Frames | 1:N | Cascade delete |
+| Context ↔ Images | N:M | Reference images |
+| Context → Messages | 1:N | Cascade delete |
+| Frame ↔ Images | N:M | Images in frame |
+| Frame → Messages | 1:N | Cascade delete |
+| Message → Images | 1:N | Source of images |
+| Image → SelectedForFrames | 1:N | SetNull on delete |
 
 **Note:** User → Projects relationship disabled for initial development.
 
 ---
 
-## Image Types
+## Image Operations
 
-| Type | Stored In | Source |
-|------|-----------|--------|
-| Generated (frame) | Image (messageId set) | GPT Image API via Message |
-| Uploaded (frame) | Image (frameId set) | User upload |
-| Context reference | ContextImage | User upload |
-| Gallery | Image (galleryProjectId set) | Moved from another project |
+### Copy (add to another place)
+```typescript
+// Copy image to another frame (image now in BOTH frames)
+await prisma.frame.update({
+  where: { id: targetFrameId },
+  data: { images: { connect: { id: imageId } } }
+});
+
+// Copy image to context
+await prisma.context.update({
+  where: { id: contextId },
+  data: { images: { connect: { id: imageId } } }
+});
+
+// Copy image to gallery
+await prisma.project.update({
+  where: { id: projectId },
+  data: { galleryImages: { connect: { id: imageId } } }
+});
+```
+
+### Move (remove from one, add to another)
+```typescript
+// Move from Frame A to Frame B
+await prisma.$transaction([
+  prisma.frame.update({
+    where: { id: frameAId },
+    data: { images: { disconnect: { id: imageId } } }
+  }),
+  prisma.frame.update({
+    where: { id: frameBId },
+    data: { images: { connect: { id: imageId } } }
+  })
+]);
+```
+
+### Delete
+```typescript
+// Remove from frame (doesn't delete the image)
+await prisma.frame.update({
+  where: { id: frameId },
+  data: { images: { disconnect: { id: imageId } } }
+});
+
+// Fully delete image (removes from all relations + Cloudinary)
+await prisma.image.delete({ where: { id: imageId } });
+await cloudinary.uploader.destroy(image.cloudinaryId);
+```
 
 ---
 
 ## Notes
 
-- **Image** can belong to Message (generated) OR Frame directly (uploaded), but not both
-- **Image** can also be in a project's Gallery (galleryProjectId set) when moved from another project
-- **Same Image can be selected by multiple Frames** - no uniqueness constraint
-- **ContextImage** is separate - these are reference images for generation, not frame images
-- **Context.content** holds the text context
-- **Frame.selectedImageId** uses `SetNull` so deleting an image doesn't delete the frame
+- **Single Image model** - no separate ContextImage
+- **Many-to-many everywhere** - same image can be in multiple frames, contexts, galleries
+- **Message is the source** - images are created via messages (1:N)
+- **Copy = connect** - add image to another relation
+- **Move = disconnect + connect** - remove from one, add to another
+- **cloudinaryId** - Cloudinary public_id for deletion
+- **selectedImageId** - which image is "chosen" for the frame's final video
+- **Cascade deletes** - deleting a video deletes its frames, context, messages
+- **SetNull for selection** - deleting an image doesn't delete the frame
 - All IDs are UUIDs for security
-- Indexes added for common query patterns
-- **Authentication disabled** for initial development - will be added later
-- **Video export disabled** for initial development - will be added later

@@ -328,26 +328,23 @@ Response 200:
 }
 
 Errors:
-400 - Image not in this frame
+400 - Image not found
 ```
 
 ### DELETE /frames/:id
 
-Delete frame and all images.
+Delete frame (removes images from this frame's relation).
 
 ```
 Response 200:
 {
-  "success": true,
-  "deleted": {
-    "images": 8
-  }
+  "success": true
 }
 ```
 
 ### DELETE /frames/:id/history
 
-Clear frame history (delete all messages and images).
+Clear frame history (delete all messages and their images).
 
 ```
 Response 200:
@@ -375,10 +372,10 @@ Response 200:
   "videoId": "uuid",
   "content": "Pixar animation style, vibrant colors",
   "images": [
-    { 
-      "id": "uuid", 
+    {
+      "id": "uuid",
       "url": "https://cloudinary.com/...",
-      "storageId": "video-frames/abc123"
+      "cloudinaryId": "video-frames/abc123"
     }
   ],
   "messages": [
@@ -424,24 +421,12 @@ Response 201:
 {
   "id": "uuid",
   "url": "https://cloudinary.com/...",
-  "storageId": "video-frames/abc123",
-  "contextId": "uuid"
+  "cloudinaryId": "video-frames/abc123"
 }
 
 Errors:
 400 - No file uploaded or invalid format
 413 - File too large (max 10MB)
-```
-
-### DELETE /context/images/:id
-
-Delete context image.
-
-```
-Response 200:
-{
-  "success": true
-}
 ```
 
 ### DELETE /videos/:videoId/context/history
@@ -482,10 +467,10 @@ Response 201:
   "withContext": true,
   "createdAt": "2024-01-15T10:00:00Z",
   "images": [
-    { "id": "uuid", "url": "https://cloudinary.com/...", "storageId": "..." },
-    { "id": "uuid", "url": "https://cloudinary.com/...", "storageId": "..." },
-    { "id": "uuid", "url": "https://cloudinary.com/...", "storageId": "..." },
-    { "id": "uuid", "url": "https://cloudinary.com/...", "storageId": "..." }
+    { "id": "uuid", "url": "https://cloudinary.com/...", "cloudinaryId": "..." },
+    { "id": "uuid", "url": "https://cloudinary.com/...", "cloudinaryId": "..." },
+    { "id": "uuid", "url": "https://cloudinary.com/...", "cloudinaryId": "..." },
+    { "id": "uuid", "url": "https://cloudinary.com/...", "cloudinaryId": "..." }
   ]
 }
 
@@ -531,8 +516,7 @@ Response 201:
 {
   "id": "uuid",
   "url": "https://cloudinary.com/...",
-  "storageId": "video-frames/abc123",
-  "frameId": "uuid"
+  "cloudinaryId": "video-frames/abc123"
 }
 
 Errors:
@@ -575,7 +559,7 @@ Response 200:
 
 ### GET /projects/:projectId/gallery
 
-Get gallery images (moved from other projects).
+Get gallery images.
 
 ```
 Response 200:
@@ -590,7 +574,7 @@ Response 200:
 
 ### DELETE /images/:id
 
-Delete single image.
+Fully delete an image (removes from Cloudinary and all relations).
 
 ```
 Response 200:
@@ -601,63 +585,42 @@ Response 200:
 
 ### POST /images/:id/copy
 
-Copy image to a frame. **Use this for context images → frame.**
+Copy image to another location. **Adds the same image to a new relation (N:M).**
 
-The original image stays in place; a new Image record is created pointing to the same Cloudinary asset.
+Image stays in original location AND is added to target.
 
 ```
 Request:
 {
-  "targetFrameId": "uuid"
+  "targetType": "frame" | "context" | "gallery",
+  "targetId": "uuid"  // frameId, contextId, or projectId
 }
 
-Response 201:
+Response 200:
 {
-  "id": "uuid",          // New image ID
-  "url": "...",
-  "storageId": "...",
-  "frameId": "uuid"
+  "success": true,
+  "image": {
+    "id": "uuid",
+    "url": "..."
+  }
 }
 ```
+
+**Example:** Copy image from context to frame
+- Before: Image in Context A
+- After: Image in Context A AND Frame B
 
 ### POST /images/:id/move
 
-Move image to another frame or project's gallery. **Updates the image record in place.**
-
-```
-Request (move to another frame - same or different project):
-{
-  "targetType": "frame",
-  "targetFrameId": "uuid"
-}
-
-Request (move to another project's gallery):
-{
-  "targetType": "gallery",
-  "targetProjectId": "uuid"
-}
-
-Response 200:
-{
-  "success": true,
-  "image": {
-    "id": "uuid",
-    "frameId": "uuid" | null,
-    "galleryProjectId": "uuid" | null
-  }
-}
-```
-
-**Note:** When moving to gallery, the image's `messageId`/`frameId` is cleared and `galleryProjectId` is set.
-
-### POST /gallery/:id/assign
-
-Assign gallery image to a frame.
+Move image to another location. **Removes from source, adds to target.**
 
 ```
 Request:
 {
-  "frameId": "uuid"
+  "sourceType": "frame" | "context" | "gallery",
+  "sourceId": "uuid",
+  "targetType": "frame" | "context" | "gallery",
+  "targetId": "uuid"
 }
 
 Response 200:
@@ -665,9 +628,29 @@ Response 200:
   "success": true,
   "image": {
     "id": "uuid",
-    "url": "...",
-    "frameId": "uuid"
+    "url": "..."
   }
+}
+```
+
+**Example:** Move image from Frame A to Frame B
+- Before: Image in Frame A
+- After: Image in Frame B only
+
+### POST /images/:id/remove
+
+Remove image from a specific relation (doesn't delete the image).
+
+```
+Request:
+{
+  "sourceType": "frame" | "context" | "gallery",
+  "sourceId": "uuid"
+}
+
+Response 200:
+{
+  "success": true
 }
 ```
 
