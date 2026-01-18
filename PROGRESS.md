@@ -40,6 +40,9 @@
 - [x] Fullscreen image viewer (click any image)
 - [x] Maximize toggle for context and prompt textboxes
 - [x] Sample gallery images on init
+- [x] Chat history view for frames (shows prompts + generated images)
+- [x] Chat history view for context (in sidebar)
+- [x] Image picker modal (select from existing images for attachments)
 
 ### Quality
 - [x] Unit tests passing (23 tests)
