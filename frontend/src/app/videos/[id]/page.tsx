@@ -24,6 +24,7 @@ import {
   Paperclip,
   User,
   Bot,
+  ArrowRightLeft,
 } from "lucide-react";
 import { mockApi } from "@/lib/mockApi";
 import type {
@@ -76,6 +77,14 @@ export default function VideoEditorPage() {
   // Image picker modal
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [imagePickerTarget, setImagePickerTarget] = useState<"frame" | "context">("frame");
+  const [imagePickerTab, setImagePickerTab] = useState<"current" | "gallery">("current");
+
+  // Copy to frame modal
+  const [copyToFrameOpen, setCopyToFrameOpen] = useState(false);
+  const [imageToCopy, setImageToCopy] = useState<ImageType | null>(null);
+
+  // Gallery images
+  const [galleryImages, setGalleryImages] = useState<ImageType[]>([]);
 
   // Chat scroll ref
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -103,6 +112,11 @@ export default function VideoEditorPage() {
     if (contextData) setContextContent(contextData.content);
     if (videoData && videoData.frames.length > 0 && !selectedFrameId) {
       setSelectedFrameId(videoData.frames[0].id);
+    }
+    // Load gallery images
+    if (videoData) {
+      const gallery = await mockApi.gallery.list(videoData.projectId);
+      setGalleryImages(gallery);
     }
     setLoading(false);
   }
@@ -165,6 +179,19 @@ export default function VideoEditorPage() {
     if (!video) return;
     const projectId = video.projectId;
     await mockApi.images.copy(imageId, "gallery", projectId);
+    loadVideo();
+  }
+
+  async function handleCopyToFrame(imageId: string, targetFrameId: string) {
+    await mockApi.images.copy(imageId, "frame", targetFrameId);
+    setCopyToFrameOpen(false);
+    setImageToCopy(null);
+    loadVideo();
+  }
+
+  function openCopyToFrameModal(image: ImageType) {
+    setImageToCopy(image);
+    setCopyToFrameOpen(true);
   }
 
   async function handleSaveContext() {
@@ -195,6 +222,7 @@ export default function VideoEditorPage() {
 
   function openImagePicker(target: "frame" | "context") {
     setImagePickerTarget(target);
+    setImagePickerTab("current");
     setImagePickerOpen(true);
   }
 
@@ -288,42 +316,164 @@ export default function VideoEditorPage() {
                 <X className="w-4 h-4" />
               </Button>
             </div>
+            {/* Tabs */}
+            <div className="flex border-b border-zinc-200 dark:border-zinc-800">
+              <button
+                className={cn(
+                  "flex-1 py-2 text-sm font-medium transition-colors",
+                  imagePickerTab === "current"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-zinc-500 hover:text-zinc-700"
+                )}
+                onClick={() => setImagePickerTab("current")}
+              >
+                {imagePickerTarget === "frame" ? "Frame Images" : "Context Images"}
+              </button>
+              <button
+                className={cn(
+                  "flex-1 py-2 text-sm font-medium transition-colors",
+                  imagePickerTab === "gallery"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-zinc-500 hover:text-zinc-700"
+                )}
+                onClick={() => setImagePickerTab("gallery")}
+              >
+                Gallery
+              </button>
+            </div>
             <div className="flex-1 p-4 overflow-auto">
-              {availableImages.length === 0 ? (
-                <p className="text-center text-zinc-500 py-8">
-                  No images available. Generate some first!
-                </p>
+              {imagePickerTab === "current" ? (
+                availableImages.length === 0 ? (
+                  <p className="text-center text-zinc-500 py-8">
+                    No images available. Generate some first!
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {availableImages.map((img) => {
+                      const isSelected = imagePickerTarget === "frame"
+                        ? attachedImages.some((a) => a.id === img.id)
+                        : contextAttachedImages.some((a) => a.id === img.id);
+                      return (
+                        <div
+                          key={img.id}
+                          className={cn(
+                            "relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
+                            isSelected
+                              ? "border-blue-500 ring-2 ring-blue-500/20"
+                              : "border-transparent hover:border-zinc-300"
+                          )}
+                          onClick={() => handleSelectFromPicker(img)}
+                        >
+                          <Image src={img.url} alt="" fill className="object-cover" />
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1">
+                              <Check className="w-3 h-3" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
               ) : (
-                <div className="grid grid-cols-3 gap-3">
-                  {availableImages.map((img) => {
-                    const isSelected = imagePickerTarget === "frame"
-                      ? attachedImages.some((a) => a.id === img.id)
-                      : contextAttachedImages.some((a) => a.id === img.id);
-                    return (
-                      <div
-                        key={img.id}
-                        className={cn(
-                          "relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
-                          isSelected
-                            ? "border-blue-500 ring-2 ring-blue-500/20"
-                            : "border-transparent hover:border-zinc-300"
-                        )}
-                        onClick={() => handleSelectFromPicker(img)}
-                      >
-                        <Image src={img.url} alt="" fill className="object-cover" />
-                        {isSelected && (
-                          <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1">
-                            <Check className="w-3 h-3" />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                galleryImages.length === 0 ? (
+                  <p className="text-center text-zinc-500 py-8">
+                    No gallery images. Copy images to the gallery first!
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {galleryImages.map((img) => {
+                      const isSelected = imagePickerTarget === "frame"
+                        ? attachedImages.some((a) => a.id === img.id)
+                        : contextAttachedImages.some((a) => a.id === img.id);
+                      return (
+                        <div
+                          key={img.id}
+                          className={cn(
+                            "relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
+                            isSelected
+                              ? "border-blue-500 ring-2 ring-blue-500/20"
+                              : "border-transparent hover:border-zinc-300"
+                          )}
+                          onClick={() => handleSelectFromPicker(img)}
+                        >
+                          <Image src={img.url} alt="" fill className="object-cover" />
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1">
+                              <Check className="w-3 h-3" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
               )}
             </div>
             <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
               <Button onClick={() => setImagePickerOpen(false)}>Done</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Copy to Frame Modal */}
+      {copyToFrameOpen && imageToCopy && video && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-8">
+          <div className="bg-white dark:bg-zinc-950 rounded-lg w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="font-semibold">Copy to Frame</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setCopyToFrameOpen(false);
+                  setImageToCopy(null);
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
+              {video.frames.length === 0 ? (
+                <p className="text-center text-zinc-500 py-4">No frames available</p>
+              ) : (
+                video.frames.map((frame) => (
+                  <button
+                    key={frame.id}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors",
+                      frame.id === selectedFrameId
+                        ? "bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800"
+                        : "hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    )}
+                    onClick={() => handleCopyToFrame(imageToCopy.id, frame.id)}
+                  >
+                    {frame.selectedImage ? (
+                      <div className="w-12 h-8 rounded overflow-hidden flex-shrink-0">
+                        <Image
+                          src={frame.selectedImage.url}
+                          alt=""
+                          width={48}
+                          height={32}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-8 rounded bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                        <ImageIcon className="w-4 h-4 text-zinc-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{frame.title}</p>
+                      <p className="text-xs text-zinc-500">{frame.images.length} images</p>
+                    </div>
+                    {frame.id === selectedFrameId && (
+                      <span className="text-xs text-blue-600">Current</span>
+                    )}
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -730,7 +880,7 @@ export default function VideoEditorPage() {
                       size="icon"
                       className="h-7 w-7"
                       onClick={() => openImagePicker("context")}
-                      disabled={!context?.images.length}
+                      title="Attach reference image from context or gallery"
                     >
                       <Paperclip className="w-3 h-3" />
                     </Button>
@@ -754,11 +904,11 @@ export default function VideoEditorPage() {
         </aside>
 
         {/* Main content - Chat view */}
-        <main className="flex-1 flex flex-col bg-zinc-50 dark:bg-zinc-900">
+        <main className="flex-1 flex flex-col bg-zinc-50 dark:bg-zinc-900 overflow-hidden">
           {selectedFrame ? (
             <>
               {/* Frame header */}
-              <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 py-4">
+              <div className="flex-shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold">{selectedFrame.title}</h2>
@@ -786,8 +936,8 @@ export default function VideoEditorPage() {
                 </div>
               </div>
 
-              {/* Chat history */}
-              <div className="flex-1 overflow-y-auto p-6">
+              {/* Chat history - scrollable container */}
+              <div className="flex-1 overflow-y-auto p-6 min-h-0">
                 {selectedFrame.messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-zinc-400">
                     <ImageIcon className="w-12 h-12 mb-4" />
@@ -865,14 +1015,25 @@ export default function VideoEditorPage() {
                                       variant="default"
                                       onClick={() => handleSelectImage(selectedFrame.id, image.id)}
                                       className="bg-green-600 hover:bg-green-700 h-7 px-2 text-xs"
+                                      title="Select for frame"
                                     >
                                       <Check className="w-3 h-3" />
                                     </Button>
                                     <Button
                                       size="sm"
                                       variant="outline"
+                                      onClick={() => openCopyToFrameModal(image)}
+                                      className="bg-white/90 h-7 px-2"
+                                      title="Copy to another frame"
+                                    >
+                                      <ArrowRightLeft className="w-3 h-3" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
                                       onClick={() => handleCopyToGallery(image.id)}
                                       className="bg-white/90 h-7 px-2"
+                                      title="Copy to gallery"
                                     >
                                       <Copy className="w-3 h-3" />
                                     </Button>
@@ -881,6 +1042,7 @@ export default function VideoEditorPage() {
                                       variant="destructive"
                                       onClick={() => handleRemoveImage(image.id, "frame", selectedFrame.id)}
                                       className="h-7 px-2"
+                                      title="Remove"
                                     >
                                       <X className="w-3 h-3" />
                                     </Button>
@@ -897,8 +1059,8 @@ export default function VideoEditorPage() {
                 )}
               </div>
 
-              {/* Generation input */}
-              <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4">
+              {/* Generation input - fixed at bottom */}
+              <div className="flex-shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4">
                 <div className="max-w-3xl mx-auto">
                   {/* Attached images preview */}
                   {attachedImages.length > 0 && (
@@ -952,8 +1114,7 @@ export default function VideoEditorPage() {
                       variant="outline"
                       size="icon"
                       onClick={() => openImagePicker("frame")}
-                      title="Attach reference image"
-                      disabled={!selectedFrame.images.length}
+                      title="Attach reference image from frame or gallery"
                     >
                       <Paperclip className="w-4 h-4" />
                     </Button>
@@ -970,7 +1131,7 @@ export default function VideoEditorPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-zinc-400 mt-2">
-                    Press Enter to generate 4 images. Click paperclip to attach reference images from this frame.
+                    Press Enter to generate. Hover images for actions: select, copy to frame, copy to gallery, or delete.
                   </p>
                 </div>
               </div>
