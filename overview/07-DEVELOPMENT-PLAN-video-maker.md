@@ -2,450 +2,335 @@
 
 ## Overview
 
-Each stage delivers working UI + API, deployed and tested before proceeding.
+MVP-first approach: Build complete UI with mocks, then gradually connect real services.
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                        Development Flow                             │
-│                                                                     │
-│  Stage 1    Stage 2    Stage 3    Stage 4    Stage 5    Stage 6    │
-│  Setup      Projects   Videos     Frames     Images     Auth       │
-│  ┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐   │
-│  │ DB  │    │ API │    │ API │    │ API │    │ API │    │ API │   │
-│  │     │    │ UI  │    │ UI  │    │ UI  │    │ UI  │    │ UI  │   │
-│  └──┬──┘    └──┬──┘    └──┬──┘    └──┬──┘    └──┬──┘    └──┬──┘   │
-│     ▼          ▼          ▼          ▼          ▼          ▼       │
-│  [DEPLOY]  [DEPLOY]   [DEPLOY]   [DEPLOY]   [DEPLOY]   [DEPLOY]   │
-│     ▼          ▼          ▼          ▼          ▼          ▼       │
-│  [TEST]    [TEST]     [TEST]     [TEST]     [TEST]     [TEST]     │
-│     ✓          ✓          ✓          ✓          ✓          ✓       │
-└────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Development Flow                                   │
+│                                                                              │
+│  Phase 1              Phase 2                                                │
+│  UI + Mocks           API + Gradual Integration                              │
+│  ┌─────────┐          ┌─────────┬─────────┬─────────┬─────────┐             │
+│  │ Next.js │          │  2.0    │  2.1    │  2.2    │  2.3    │             │
+│  │ mockApi │    →     │ All     │ OpenAI  │ Cloud-  │ Postgre │             │
+│  │ .ts     │          │ Mocked  │ REAL    │ inary   │ SQL     │             │
+│  └────┬────┘          └────┬────┴────┬────┴────┬────┴────┬────┘             │
+│       ▼                    ▼         ▼         ▼         ▼                   │
+│  [DEPLOY]             [DEPLOY]  [DEPLOY]  [DEPLOY]  [DEPLOY]                │
+│       ▼                    ▼         ▼         ▼         ▼                   │
+│  [VALIDATE UX]        [TEST]    [TEST]    [TEST]    [TEST]                  │
+│       ✓                    ✓         ✓         ✓         ✓                   │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Auth is last** - see results fast, secure later.
+**Key Principle:** UI has zero mocks after Phase 1. All mocking lives in API layer.
 
 ---
 
-## Stage 1: Project Setup & Database
+## Phase 1: UI with Mock Data
 
-**Goal:** Deployable skeleton with database
+**Goal:** Complete, working UI with hardcoded data. No HTTP calls.
+
+### Approach
+- UI imports `mockApi.ts` directly
+- Returns hardcoded/random data
+- All pages and interactions work
+- Deploy to Railway as Next.js app
 
 ### Deliverables
-- [ ] Monorepo structure
-- [ ] Backend (Fastify + Prisma)
-- [ ] Frontend (Next.js)
-- [ ] Database schema (all models)
-- [ ] Health endpoint
-- [ ] Railway deployment
+- [ ] Next.js project setup
+- [ ] Mock data service (`src/lib/mockApi.ts`)
+- [ ] All pages working with mock data
+- [ ] Deploy to Railway
 
-### Files
+### Pages
 ```
-video-frames-editor/
-├── backend/
-│   ├── src/
-│   │   ├── app.ts
-│   │   └── routes/health.ts
-│   ├── prisma/schema.prisma
-│   ├── tests/
-│   │   ├── helpers/db-adapter.ts
-│   │   └── database.test.ts
-│   └── package.json
-├── frontend/
-│   ├── src/app/page.tsx
-│   └── package.json
-└── README.md
+/                      → Redirect to /projects
+/projects              → List projects, create new
+/projects/[id]         → Project detail with videos list
+/videos/[id]           → Video editor (frames + context + chat)
+/projects/[id]/gallery → Gallery page
 ```
 
-### API
-```
-GET /health → { status: "ok", db: "connected" }
+### Mock Data Structure
+```typescript
+// src/lib/mockApi.ts
+
+export const mockApi = {
+  projects: {
+    list: () => [...],
+    get: (id) => {...},
+    create: (name) => {...},
+    delete: (id) => {...},
+  },
+  videos: {
+    list: (projectId) => [...],
+    get: (id) => {...},
+    create: (projectId, name) => {...},
+    delete: (id) => {...},
+  },
+  frames: {
+    list: (videoId) => [...],
+    create: (videoId, title) => {...},
+    reorder: (frameId, newOrder) => [...],
+    delete: (id) => {...},
+  },
+  context: {
+    get: (videoId) => {...},
+    update: (videoId, content) => {...},
+  },
+  generate: {
+    // Returns random picsum.photos URLs
+    images: (frameId, prompt) => [...],
+  },
+  images: {
+    select: (frameId, imageId) => {...},
+    delete: (id) => {...},
+  },
+};
 ```
 
-### Test Gate ✅ Claude Code
-```bash
-npx vitest run tests/database.test.ts
-```
-
-| Test | Pass Criteria |
-|------|---------------|
-| DB connection | Connects successfully |
-| All models | CRUD works for each |
-| Cascade deletes | Full chain works |
-| Frame ordering | Order maintained |
-
-### Deploy Gate ⚠️ Local
-```bash
-# Deploy to Railway, then:
-curl https://your-app.railway.app/health
-# → { "status": "ok", "db": "connected" }
-```
-
-**Exit:** Health returns 200, DB connected
+### Exit Criteria
+- [ ] All pages render correctly
+- [ ] Navigation works
+- [ ] CRUD operations work (in memory)
+- [ ] Image generation shows placeholder images
+- [ ] Frame reordering works
+- [ ] Context editing works
+- [ ] User validates UX in browser
 
 ---
 
-## Stage 2: Projects (API + UI)
+## Phase 2: API with Gradual Integration
 
-**Goal:** Create and manage projects
+**Goal:** Real API, gradually replacing mocks with real services.
 
-### Deliverables
-- [ ] Projects API (CRUD)
-- [ ] Projects list page
-- [ ] Create project modal
-- [ ] Delete project
+### Phase 2.0: API with All Mocks
 
-### API
+**Goal:** Real HTTP endpoints, but all external services mocked.
+
+| Service | Status |
+|---------|--------|
+| OpenAI | MOCK |
+| Cloudinary | MOCK |
+| PostgreSQL | MOCK |
+
+#### Deliverables
+- [ ] Fastify API setup
+- [ ] All endpoints implemented
+- [ ] Mock providers for all services
+- [ ] UI switches from `mockApi.ts` to real HTTP calls
+- [ ] Deploy API to Railway
+
+#### Mock Implementations
+```typescript
+// Mock Image Generation Provider
+class MockImageProvider implements ImageGenerationProvider {
+  async generate(options) {
+    return Array(4).fill(null).map((_, i) => ({
+      url: `https://picsum.photos/seed/${Date.now()}-${i}/1792/1024`,
+      storageId: `mock-${Date.now()}-${i}`,
+      provider: 'mock',
+      model: 'mock',
+    }));
+  }
+}
+
+// Mock Storage Provider
+class MockStorageProvider implements StorageProvider {
+  async uploadBase64(data) {
+    return {
+      url: `https://picsum.photos/seed/${Date.now()}/800/600`,
+      storageId: `mock-${Date.now()}`,
+      provider: 'mock',
+    };
+  }
+  async delete(id) { /* no-op */ }
+}
+
+// Mock Database (in-memory)
+const mockDb = {
+  projects: new Map(),
+  videos: new Map(),
+  frames: new Map(),
+  // ...
+};
 ```
-GET    /projects         → Project[]
-POST   /projects         { name } → Project
-GET    /projects/:id     → Project
-DELETE /projects/:id     → void
-```
 
-### UI Pages
-```
-/projects          → List all projects, "New Project" button
-/projects/[id]     → Project detail (placeholder for videos)
-```
-
-### Test Gate ✅ Claude Code
-```bash
-npx vitest run tests/projects.test.ts
-```
-
-| Test | Pass Criteria |
-|------|---------------|
-| Create project | Returns project with ID |
-| List projects | Returns array |
-| Get project | Returns single project |
-| Delete project | Removes from DB |
-| Not found | 404 for invalid ID |
-
-### Deploy Gate ⚠️ Local
-```bash
-# After deploy:
-# 1. Open https://your-app.railway.app
-# 2. Create a project
-# 3. See it in list
-# 4. Delete it
-```
-
-**Exit:** Can create/view/delete projects in browser
+#### Exit Criteria
+- [ ] All API endpoints return correct responses
+- [ ] UI works with real HTTP calls
+- [ ] No external service costs
 
 ---
 
-## Stage 3: Videos (API + UI)
+### Phase 2.1: Real OpenAI
 
-**Goal:** Create videos within projects
+**Goal:** Connect real OpenAI, keep other services mocked.
 
-### Deliverables
-- [ ] Videos API (CRUD)
-- [ ] Context API (read/update)
-- [ ] Videos list in project page
-- [ ] Video editor page (empty for now)
-- [ ] Context editor panel
+| Service | Status |
+|---------|--------|
+| OpenAI | **REAL** |
+| Cloudinary | MOCK |
+| PostgreSQL | MOCK |
 
-### API
-```
-GET    /projects/:id/videos   → Video[]
-POST   /projects/:id/videos   { name } → Video (auto-creates Context)
-GET    /videos/:id            → Video
-DELETE /videos/:id            → void
+#### Deliverables
+- [ ] OpenAI provider implementation
+- [ ] Environment variable: `OPENAI_API_KEY`
+- [ ] Test with real image generation
 
-GET    /videos/:id/context    → Context
-PATCH  /videos/:id/context    { content } → Context
-```
-
-### UI Pages
-```
-/projects/[id]     → Shows videos list, "New Video" button
-/videos/[id]       → Video editor with context panel (frames empty)
+#### Changes
+```typescript
+// Switch provider in config
+const imageProvider = process.env.OPENAI_API_KEY
+  ? new OpenAIProvider()
+  : new MockImageProvider();
 ```
 
-### Test Gate ✅ Claude Code
-```bash
-npx vitest run tests/videos.test.ts tests/context.test.ts
-```
-
-| Test | Pass Criteria |
-|------|---------------|
-| Create video | Auto-creates empty context |
-| List videos | Scoped to project |
-| Get/update context | Persists content |
-| Delete video | Cascades to context |
-
-### Deploy Gate ⚠️ Local
-```bash
-# After deploy:
-# 1. Create project
-# 2. Create video inside project
-# 3. Open video editor
-# 4. Edit context, refresh, see it persisted
-```
-
-**Exit:** Videos and context working in browser
+#### Exit Criteria
+- [ ] Real images generated from prompts
+- [ ] Images stored temporarily (mock storage returns picsum URLs)
+- [ ] ~$1-2 spent testing
 
 ---
 
-## Stage 4: Frames (API + UI)
+### Phase 2.2: Real Cloudinary
 
-**Goal:** Create and reorder frames
+**Goal:** Connect real Cloudinary, database still mocked.
 
-### Deliverables
-- [ ] Frames API (CRUD + reorder)
-- [ ] Frame list panel (left side)
-- [ ] Frame detail panel (right side)
-- [ ] Drag-and-drop reordering
-- [ ] Frame title editing
+| Service | Status |
+|---------|--------|
+| OpenAI | REAL |
+| Cloudinary | **REAL** |
+| PostgreSQL | MOCK |
 
-### API
-```
-GET    /videos/:id/frames     → Frame[] (ordered)
-POST   /videos/:id/frames     { title } → Frame (auto-order)
-GET    /frames/:id            → Frame
-PATCH  /frames/:id            { title?, order? } → Frame
-DELETE /frames/:id            → void
-```
+#### Deliverables
+- [ ] Cloudinary provider implementation
+- [ ] Environment variables: `CLOUDINARY_*`
+- [ ] Generated images uploaded to Cloudinary
 
-### UI Layout
-```
-┌─────────────────────────────────────────────────┐
-│ Video: My Video                    [Context]    │
-├──────────────┬──────────────────────────────────┤
-│ Frames       │  Frame Detail                    │
-│ ┌──────────┐ │  ┌────────────────────────────┐  │
-│ │ Scene 1  │ │  │ Title: Scene 1             │  │
-│ ├──────────┤ │  │                            │  │
-│ │ Scene 2  │ │  │ (images will go here)      │  │
-│ ├──────────┤ │  │                            │  │
-│ │ Scene 3  │ │  │                            │  │
-│ └──────────┘ │  └────────────────────────────┘  │
-│ [+ Add Frame]│                                  │
-└──────────────┴──────────────────────────────────┘
+#### Changes
+```typescript
+// Switch provider in config
+const storageProvider = process.env.CLOUDINARY_CLOUD_NAME
+  ? new CloudinaryStorage()
+  : new MockStorageProvider();
 ```
 
-### Test Gate ✅ Claude Code
-```bash
-npx vitest run tests/frames.test.ts
-```
-
-| Test | Pass Criteria |
-|------|---------------|
-| Create frame | Gets next order number |
-| List frames | Returns in order |
-| Reorder frame | Shifts others correctly |
-| Delete frame | Removes, others stay ordered |
-| Update title | Persists change |
-
-### Deploy Gate ⚠️ Local
-```bash
-# After deploy:
-# 1. Open video
-# 2. Add 3 frames
-# 3. Drag to reorder
-# 4. Refresh, order persists
-# 5. Delete middle frame, order still correct
-```
-
-**Exit:** Frame CRUD and reordering works in browser
+#### Exit Criteria
+- [ ] Images persist in Cloudinary
+- [ ] URLs are permanent CDN links
+- [ ] Delete works
 
 ---
 
-## Stage 5: Image Generation (API + UI)
+### Phase 2.3: Real PostgreSQL
 
-**Goal:** Generate images via chat, select for frames
+**Goal:** Full production system with real database.
 
-### Deliverables
-- [ ] Image provider abstraction
-- [ ] GPT-Image-1 provider
-- [ ] Cloudinary upload service
-- [ ] Messages API
-- [ ] Chat UI in frame panel
-- [ ] Image grid with selection
-- [ ] Gallery page
+| Service | Status |
+|---------|--------|
+| OpenAI | REAL |
+| Cloudinary | REAL |
+| PostgreSQL | **REAL** |
 
-### API
-```
-GET    /frames/:id/messages   → Message[] (with images)
-POST   /frames/:id/messages   { prompt, withContext } → Message + Image[]
-POST   /frames/:id/select     { imageId } → Frame
+#### Deliverables
+- [ ] Prisma setup
+- [ ] Database migrations
+- [ ] Railway PostgreSQL
+- [ ] Replace mock DB with Prisma
 
-GET    /projects/:id/gallery  → GalleryImage[]
-POST   /projects/:id/gallery  { imageId } → GalleryImage
-DELETE /gallery/:id           → void
-```
+#### Changes
+```typescript
+// Use Prisma instead of mock
+import { prisma } from './plugins/prisma';
 
-### UI Components
-```
-Frame Detail Panel:
-┌────────────────────────────────────────┐
-│ Scene 1                                │
-├────────────────────────────────────────┤
-│ Selected: [image thumbnail]            │
-├────────────────────────────────────────┤
-│ Chat:                                  │
-│ ┌────────────────────────────────────┐ │
-│ │ You: A cat on a beach              │ │
-│ │ ┌─────┬─────┬─────┬─────┐         │ │
-│ │ │ img │ img │ img │ img │         │ │
-│ │ └─────┴─────┴─────┴─────┘         │ │
-│ │ You: Make it sunset               │ │
-│ │ ┌─────┬─────┬─────┬─────┐         │ │
-│ │ │ img │ img │ img │ img │         │ │
-│ │ └─────┴─────┴─────┴─────┘         │ │
-│ └────────────────────────────────────┘ │
-│ [____prompt____] [x] Use Context [Send]│
-└────────────────────────────────────────┘
+// All routes now use prisma.project.findMany(), etc.
 ```
 
-### Test Gate ✅ Claude Code (mocked)
-```bash
-npx vitest run tests/image-generation.test.ts tests/messages.test.ts
-```
-
-| Test | Pass Criteria |
-|------|---------------|
-| Mock provider | Returns 4 URLs |
-| Create message | Saves with images |
-| List messages | Returns with images |
-| Select image | Updates frame.selectedImageId |
-| Context merge | Combines context + prompt |
-| Gallery add | Saves image reference |
-
-### Test Gate ⚠️ Local (real API)
-```bash
-OPENAI_API_KEY=sk-... CLOUDINARY_URL=... npx vitest run tests/image-generation.real.test.ts
-```
-
-| Test | Pass Criteria |
-|------|---------------|
-| Real generation | Returns valid URLs |
-| Cloudinary upload | Returns CDN URL |
-
-### Deploy Gate ⚠️ Local
-```bash
-# After deploy:
-# 1. Open frame
-# 2. Type prompt, send
-# 3. See 4 images appear
-# 4. Click one to select
-# 5. See it as selected image
-# 6. Add to gallery
-# 7. Check gallery page
-```
-
-**Exit:** Full image generation flow works in browser
+#### Exit Criteria
+- [ ] Data persists across restarts
+- [ ] All CRUD operations work
+- [ ] Cascade deletes work
+- [ ] Full production system running
 
 ---
 
-## Stage 6: Authentication (API + UI)
+## Future Phases
 
-**Goal:** Secure the app with user accounts
+### Phase 3: Authentication (DISABLED)
+- JWT-based auth
+- User isolation
+- Protected routes
 
-### Deliverables
-- [ ] Auth API (signup, login, me)
-- [ ] JWT middleware
-- [ ] Protect all routes
-- [ ] Login/signup pages
-- [ ] Auth state in frontend
-- [ ] Logout
-
-### API
-```
-POST /auth/signup    { email, password } → { token, user }
-POST /auth/login     { email, password } → { token, user }
-GET  /auth/me        [Auth] → User
-
-# All other routes now require: Authorization: Bearer <token>
-```
-
-### UI Pages
-```
-/login     → Login form
-/signup    → Signup form
-/          → Redirect to /login or /projects
-```
-
-### Test Gate ✅ Claude Code
-```bash
-npx vitest run tests/auth.test.ts
-```
-
-| Test | Pass Criteria |
-|------|---------------|
-| Signup | Creates user, returns token |
-| Login | Returns token for valid creds |
-| Invalid login | Rejects wrong password |
-| JWT valid | /me returns user |
-| JWT invalid | 401 on bad token |
-| Protected routes | 401 without token |
-| User isolation | Can't see other's projects |
-
-### Deploy Gate ⚠️ Local
-```bash
-# After deploy:
-# 1. Try /projects without login → redirects to /login
-# 2. Sign up
-# 3. Create project
-# 4. Logout
-# 5. Login as different user
-# 6. Don't see first user's project
-```
-
-**Exit:** Full auth working, users isolated
-
----
-
-## Future: Video Export
-
-**Marked for future development**
-
-- Export frames as video via Cloudinary
+### Phase 4: Video Export (DISABLED)
+- Cloudinary video generation
 - Export progress tracking
-- Video gallery
 
 ---
 
 ## Summary
 
-| Stage | Deliverable | API | UI | Tests (CC) | Deploy Check |
-|-------|-------------|-----|-----|------------|--------------|
-| 1 | Setup | Health | Landing | DB tests | Health 200 |
-| 2 | Projects | CRUD | List/Create | 5+ | CRUD in browser |
-| 3 | Videos | CRUD + Context | List/Editor | 5+ | Context persists |
-| 4 | Frames | CRUD + Reorder | List/Drag | 5+ | Reorder works |
-| 5 | Images | Generate/Select | Chat/Grid | 6+ | Full flow |
-| 6 | Auth | JWT | Login/Signup | 7+ | User isolation |
-
-**Total: ~35+ tests**, most in Claude Code VM
+| Phase | OpenAI | Cloudinary | PostgreSQL | UI Source |
+|-------|--------|------------|------------|-----------|
+| 1 | - | - | - | mockApi.ts |
+| 2.0 | mock | mock | mock | HTTP calls |
+| 2.1 | **REAL** | mock | mock | HTTP calls |
+| 2.2 | real | **REAL** | mock | HTTP calls |
+| 2.3 | real | real | **REAL** | HTTP calls |
 
 ### Workflow
 
 ```
-For each stage:
-1. Claude builds API + UI
-2. Claude runs tests (npx vitest run)
-3. If green → you deploy to Railway
-4. You verify in browser
-5. Move to next stage
+Phase 1:
+1. Claude builds UI with mockApi.ts
+2. Deploy to Railway
+3. User validates UX
+4. Iterate until satisfied
+
+Phase 2.x:
+1. Claude builds/updates API
+2. Deploy to Railway
+3. Test specific service integration
+4. Move to next sub-phase
 ```
 
 ---
 
-## Quick Commands
+## Environment Variables by Phase
 
+### Phase 1
 ```bash
-# Claude Code (all stages)
-npx vitest run
+# Frontend only - no env vars needed
+```
 
-# Stage-specific
-npx vitest run tests/database.test.ts      # Stage 1
-npx vitest run tests/projects.test.ts      # Stage 2
-npx vitest run tests/videos.test.ts        # Stage 3
-npx vitest run tests/frames.test.ts        # Stage 4
-npx vitest run tests/messages.test.ts      # Stage 5
-npx vitest run tests/auth.test.ts          # Stage 6
+### Phase 2.0
+```bash
+# Backend
+PORT=4000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:3000
+# All services mocked - no API keys needed
+```
 
-# Local with real APIs (Stage 5)
-OPENAI_API_KEY=sk-... CLOUDINARY_URL=... npx vitest run tests/image-generation.real.test.ts
+### Phase 2.1
+```bash
+# Add OpenAI
+OPENAI_API_KEY=sk-...
+IMAGE_PROVIDER=openai-gpt-image
+```
+
+### Phase 2.2
+```bash
+# Add Cloudinary
+STORAGE_PROVIDER=cloudinary
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+```
+
+### Phase 2.3
+```bash
+# Add PostgreSQL
+DATABASE_URL=postgresql://...
 ```
