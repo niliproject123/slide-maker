@@ -344,8 +344,8 @@ export default function VideoEditorPage() {
 
       {/* Image Picker Modal */}
       {imagePickerOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-8">
-          <div className="bg-white dark:bg-zinc-950 rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-0 sm:p-8">
+          <div className="bg-white dark:bg-zinc-950 sm:rounded-lg w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="font-semibold">Select Reference Image</h3>
               <Button
@@ -388,7 +388,7 @@ export default function VideoEditorPage() {
                     No images available. Generate some first!
                   </p>
                 ) : (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {availableImages.map((img) => {
                       const isSelected = imagePickerTarget === "frame"
                         ? attachedImages.some((a) => a.id === img.id)
@@ -421,7 +421,7 @@ export default function VideoEditorPage() {
                     No gallery images. Copy images to the gallery first!
                   </p>
                 ) : (
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {galleryImages.map((img) => {
                       const isSelected = imagePickerTarget === "frame"
                         ? attachedImages.some((a) => a.id === img.id)
@@ -459,8 +459,8 @@ export default function VideoEditorPage() {
 
       {/* Copy to Frame Modal */}
       {copyToFrameOpen && imageToCopy && video && (
-        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-8">
-          <div className="bg-white dark:bg-zinc-950 rounded-lg w-full max-w-md">
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-0 sm:p-8">
+          <div className="bg-white dark:bg-zinc-950 sm:rounded-lg w-full h-full sm:h-auto sm:max-w-md">
             <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="font-semibold">Copy to Frame</h3>
               <Button
@@ -521,8 +521,8 @@ export default function VideoEditorPage() {
 
       {/* Maximized Context Modal */}
       {contextMaximized && (
-        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-8">
-          <div className="bg-white dark:bg-zinc-950 rounded-lg w-full max-w-3xl max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-0 sm:p-8">
+          <div className="bg-white dark:bg-zinc-950 sm:rounded-lg w-full h-full sm:h-auto sm:max-w-3xl sm:max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="font-semibold">Context</h3>
               <Button
@@ -562,8 +562,8 @@ export default function VideoEditorPage() {
 
       {/* Maximized Prompt Modal */}
       {promptMaximized && (
-        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-8">
-          <div className="bg-white dark:bg-zinc-950 rounded-lg w-full max-w-3xl max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-0 sm:p-8">
+          <div className="bg-white dark:bg-zinc-950 sm:rounded-lg w-full h-full sm:h-auto sm:max-w-3xl sm:max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="font-semibold">Image Prompt</h3>
               <Button
@@ -641,38 +641,78 @@ export default function VideoEditorPage() {
       )}
 
       {/* Header */}
-      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 py-3">
+      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 sm:px-4 py-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            {/* Mobile menu button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden h-8 w-8"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
             <Link
               href={`/projects/${video.projectId}`}
-              className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+              className="hidden sm:inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
             >
               <ArrowLeft className="w-4 h-4" />
               Back
             </Link>
-            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+            <Link
+              href={`/projects/${video.projectId}`}
+              className="sm:hidden inline-flex items-center justify-center"
+            >
+              <ArrowLeft className="w-4 h-4 text-zinc-500" />
+            </Link>
+            <h1 className="text-base sm:text-xl font-semibold text-zinc-900 dark:text-zinc-100 truncate">
               {video.name}
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Link href={`/projects/${video.projectId}/gallery`}>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="h-8 px-2 sm:px-3">
                 <ImageIcon className="w-4 h-4" />
-                Gallery
+                <span className="hidden sm:inline ml-1">Gallery</span>
               </Button>
             </Link>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 flex">
+      <div className="flex-1 flex overflow-hidden">
+        {/* Mobile sidebar overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-black/50 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Frames sidebar */}
-        <aside className="w-72 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col">
+        <aside
+          className={cn(
+            "w-72 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col",
+            "fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 ease-in-out",
+            "md:relative md:translate-x-0 md:transform-none",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
           <div className="p-3 border-b border-zinc-200 dark:border-zinc-800">
-            <h2 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-              Frames
-            </h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Frames
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden h-6 w-6"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Input
                 placeholder="New frame title"
@@ -1008,7 +1048,7 @@ export default function VideoEditorPage() {
               </div>
 
               {/* Chat history - scrollable container */}
-              <div className="flex-1 overflow-y-auto p-6 min-h-0">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-6 min-h-0">
                 {selectedFrame.messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-zinc-400">
                     <ImageIcon className="w-12 h-12 mb-4" />
@@ -1131,16 +1171,16 @@ export default function VideoEditorPage() {
               </div>
 
               {/* Generation input - fixed at bottom */}
-              <div className="flex-shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4">
+              <div className="flex-shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-3 sm:p-4">
                 <div className="max-w-3xl mx-auto">
                   {/* Attached images preview */}
                   {attachedImages.length > 0 && (
                     <div className="flex gap-2 mb-2 flex-wrap">
                       {attachedImages.map((img) => (
-                        <div key={img.id} className="relative w-16 h-12 rounded overflow-hidden group">
+                        <div key={img.id} className="relative w-12 h-9 sm:w-16 sm:h-12 rounded overflow-hidden group">
                           <Image src={img.url} alt="" fill className="object-cover" />
                           <button
-                            className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl opacity-0 group-hover:opacity-100"
+                            className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl"
                             onClick={() => removeAttachedImage(img.id)}
                           >
                             <X className="w-3 h-3" />
@@ -1152,16 +1192,16 @@ export default function VideoEditorPage() {
                   <div className="flex gap-2">
                     <div className="flex-1 relative">
                       <Input
-                        placeholder="Describe the image you want to generate..."
+                        placeholder="Describe the image..."
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         onKeyDown={(e) =>
                           e.key === "Enter" && !e.shiftKey && handleGenerate()
                         }
                         disabled={generating}
-                        className="pr-32"
+                        className="pr-8 sm:pr-32"
                       />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1180,28 +1220,39 @@ export default function VideoEditorPage() {
                           Context
                         </label>
                       </div>
+                      {/* Mobile expand button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="sm:hidden absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                        onClick={() => setPromptMaximized(true)}
+                      >
+                        <Maximize2 className="w-3 h-3" />
+                      </Button>
                     </div>
                     <Button
                       variant="outline"
                       size="icon"
+                      className="h-10 w-10 flex-shrink-0"
                       onClick={() => openImagePicker("frame")}
-                      title="Attach reference image from frame or gallery"
+                      title="Attach reference image"
                     >
                       <Paperclip className="w-4 h-4" />
                     </Button>
                     <Button
                       onClick={handleGenerate}
                       disabled={!prompt.trim() || generating}
+                      className="h-10 px-3 sm:px-4 flex-shrink-0"
                     >
                       {generating ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <Send className="w-4 h-4" />
                       )}
-                      Generate
+                      <span className="hidden sm:inline ml-1">Generate</span>
                     </Button>
                   </div>
-                  <p className="text-xs text-zinc-400 mt-2">
+                  <p className="text-xs text-zinc-400 mt-2 hidden sm:block">
                     Press Enter to generate. Hover images for actions: select, copy to frame, copy to gallery, or delete.
                   </p>
                 </div>
@@ -1319,16 +1370,16 @@ export default function VideoEditorPage() {
                   </div>
 
                   {/* Main Chat Generation input - fixed at bottom */}
-                  <div className="flex-shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4">
+                  <div className="flex-shrink-0 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-3 sm:p-4">
                     <div className="max-w-3xl mx-auto">
                       {/* Attached images preview */}
                       {mainChatAttachedImages.length > 0 && (
                         <div className="flex gap-2 mb-2 flex-wrap">
                           {mainChatAttachedImages.map((img) => (
-                            <div key={img.id} className="relative w-16 h-12 rounded overflow-hidden group">
+                            <div key={img.id} className="relative w-12 h-9 sm:w-16 sm:h-12 rounded overflow-hidden group">
                               <Image src={img.url} alt="" fill className="object-cover" />
                               <button
-                                className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl opacity-0 group-hover:opacity-100"
+                                className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl"
                                 onClick={() => setMainChatAttachedImages((prev) => prev.filter((i) => i.id !== img.id))}
                               >
                                 <X className="w-3 h-3" />
@@ -1340,7 +1391,7 @@ export default function VideoEditorPage() {
                       <div className="flex gap-2">
                         <div className="flex-1">
                           <Input
-                            placeholder="Describe images to generate..."
+                            placeholder="Describe images..."
                             value={mainChatPrompt}
                             onChange={(e) => setMainChatPrompt(e.target.value)}
                             onKeyDown={(e) =>
@@ -1352,6 +1403,7 @@ export default function VideoEditorPage() {
                         <Button
                           variant="outline"
                           size="icon"
+                          className="h-10 w-10 flex-shrink-0"
                           onClick={() => openImagePicker("mainChat")}
                           title="Attach reference image"
                         >
@@ -1360,6 +1412,7 @@ export default function VideoEditorPage() {
                         <Button
                           onClick={handleGenerateMainChat}
                           disabled={!mainChatPrompt.trim() || generatingMainChat}
+                          className="h-10 px-3 sm:px-4 flex-shrink-0"
                         >
                           {generatingMainChat ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -1369,7 +1422,7 @@ export default function VideoEditorPage() {
                           <span className="hidden sm:inline ml-1">Generate</span>
                         </Button>
                       </div>
-                      <p className="text-xs text-zinc-400 mt-2">
+                      <p className="text-xs text-zinc-400 mt-2 hidden sm:block">
                         Generate images here and copy them to frames using the swap icon.
                       </p>
                     </div>
