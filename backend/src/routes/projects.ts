@@ -108,7 +108,7 @@ export async function projectRoutes(fastify: FastifyInstance) {
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
         videos,
-        galleryCount: galleryImages.length,
+        galleryImages,
       });
     }
   );
