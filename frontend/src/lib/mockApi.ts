@@ -4,11 +4,13 @@ import type {
   Video,
   Context,
   Frame,
+  MainChat,
   Message,
   Image,
   ProjectWithVideos,
   VideoWithDetails,
   FrameWithImages,
+  MainChatWithMessages,
   MessageWithImages,
   ContextWithImages,
 } from "./types";
@@ -19,11 +21,13 @@ const storage = {
   videos: new Map<string, Video>(),
   contexts: new Map<string, Context>(),
   frames: new Map<string, Frame>(),
+  mainChats: new Map<string, MainChat>(),
   messages: new Map<string, Message>(),
   images: new Map<string, Image>(),
   // Many-to-many relations
   frameImages: new Map<string, Set<string>>(), // frameId -> Set<imageId>
   contextImages: new Map<string, Set<string>>(), // contextId -> Set<imageId>
+  mainChatImages: new Map<string, Set<string>>(), // mainChatId -> Set<imageId>
   galleryImages: new Map<string, Set<string>>(), // projectId -> Set<imageId>
 };
 
@@ -119,6 +123,9 @@ function createVideoInternal(projectId: string, name: string): Video {
   storage.contexts.set(context.id, context);
   storage.contextImages.set(context.id, new Set());
 
+  // Create default main chat for video
+  createMainChatInternal(video.id, "Main Chat");
+
   return video;
 }
 
@@ -139,6 +146,20 @@ function createFrameInternal(videoId: string, title: string): Frame {
   storage.frames.set(frame.id, frame);
   storage.frameImages.set(frame.id, new Set());
   return frame;
+}
+
+function createMainChatInternal(videoId: string, name: string): MainChat {
+  const now = new Date();
+  const mainChat: MainChat = {
+    id: uuidv4(),
+    name,
+    videoId,
+    createdAt: now,
+    updatedAt: now,
+  };
+  storage.mainChats.set(mainChat.id, mainChat);
+  storage.mainChatImages.set(mainChat.id, new Set());
+  return mainChat;
 }
 
 // Simulate network delay
@@ -273,7 +294,40 @@ export const mockApi = {
           return { ...frame, images, selectedImage, messages };
         });
 
-      return { ...video, context, frames };
+      // Get main chats for this video
+      const mainChats = Array.from(storage.mainChats.values())
+        .filter((mc) => mc.videoId === id)
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        )
+        .map((mainChat): MainChatWithMessages => {
+          const imageIds = storage.mainChatImages.get(mainChat.id) || new Set();
+          const images = Array.from(imageIds)
+            .map((imgId) => storage.images.get(imgId))
+            .filter((img): img is Image => img !== undefined);
+
+          const messages = Array.from(storage.messages.values())
+            .filter((m) => m.mainChatId === mainChat.id)
+            .sort(
+              (a, b) =>
+                new Date(a.createdAt).getTime() -
+                new Date(b.createdAt).getTime()
+            )
+            .map((msg): MessageWithImages => {
+              const msgImages = Array.from(storage.images.values()).filter(
+                (img) => img.messageId === msg.id
+              );
+              const attachedImages = (msg.attachedImageIds || [])
+                .map((id) => storage.images.get(id))
+                .filter((img): img is Image => img !== undefined);
+              return { ...msg, images: msgImages, attachedImages };
+            });
+
+          return { ...mainChat, images, messages };
+        });
+
+      return { ...video, context, frames, mainChats };
     },
 
     async create(projectId: string, name: string): Promise<Video> {
@@ -504,6 +558,87 @@ export const mockApi = {
     },
   },
 
+  // Main Chats
+  mainChats: {
+    async list(videoId: string): Promise<MainChatWithMessages[]> {
+      initializeMockData();
+      await delay(100);
+      return Array.from(storage.mainChats.values())
+        .filter((mc) => mc.videoId === videoId)
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        )
+        .map((mainChat): MainChatWithMessages => {
+          const imageIds = storage.mainChatImages.get(mainChat.id) || new Set();
+          const images = Array.from(imageIds)
+            .map((imgId) => storage.images.get(imgId))
+            .filter((img): img is Image => img !== undefined);
+
+          const messages = Array.from(storage.messages.values())
+            .filter((m) => m.mainChatId === mainChat.id)
+            .sort(
+              (a, b) =>
+                new Date(a.createdAt).getTime() -
+                new Date(b.createdAt).getTime()
+            )
+            .map((msg): MessageWithImages => {
+              const msgImages = Array.from(storage.images.values()).filter(
+                (img) => img.messageId === msg.id
+              );
+              const attachedImages = (msg.attachedImageIds || [])
+                .map((id) => storage.images.get(id))
+                .filter((img): img is Image => img !== undefined);
+              return { ...msg, images: msgImages, attachedImages };
+            });
+
+          return { ...mainChat, images, messages };
+        });
+    },
+
+    async create(videoId: string, name: string): Promise<MainChat> {
+      initializeMockData();
+      await delay(150);
+      return createMainChatInternal(videoId, name);
+    },
+
+    async update(id: string, name: string): Promise<MainChat | null> {
+      initializeMockData();
+      await delay(100);
+      const mainChat = storage.mainChats.get(id);
+      if (!mainChat) return null;
+
+      mainChat.name = name;
+      mainChat.updatedAt = new Date();
+      return mainChat;
+    },
+
+    async delete(id: string): Promise<boolean> {
+      initializeMockData();
+      await delay(150);
+      const mainChat = storage.mainChats.get(id);
+      if (!mainChat) return false;
+
+      // Delete messages and their images
+      const messages = Array.from(storage.messages.values()).filter(
+        (m) => m.mainChatId === id
+      );
+      for (const msg of messages) {
+        const images = Array.from(storage.images.values()).filter(
+          (img) => img.messageId === msg.id
+        );
+        for (const img of images) {
+          storage.images.delete(img.id);
+        }
+        storage.messages.delete(msg.id);
+      }
+
+      storage.mainChatImages.delete(id);
+      storage.mainChats.delete(id);
+      return true;
+    },
+  },
+
   // Image generation
   generate: {
     async images(
@@ -525,6 +660,7 @@ export const mockApi = {
         withContext,
         frameId,
         contextId: null,
+        mainChatId: null,
         attachedImageIds,
         createdAt: new Date(),
       };
@@ -576,6 +712,7 @@ export const mockApi = {
         withContext: false,
         frameId: null,
         contextId,
+        mainChatId: null,
         attachedImageIds,
         createdAt: new Date(),
       };
@@ -608,12 +745,64 @@ export const mockApi = {
 
       return { ...message, images, attachedImages };
     },
+
+    async mainChatImages(
+      mainChatId: string,
+      prompt: string,
+      attachedImageIds: string[] = []
+    ): Promise<MessageWithImages> {
+      initializeMockData();
+      await delay(500);
+
+      const mainChat = storage.mainChats.get(mainChatId);
+      if (!mainChat) throw new Error("Main chat not found");
+
+      // Create message
+      const message: Message = {
+        id: uuidv4(),
+        prompt,
+        withContext: false,
+        frameId: null,
+        contextId: null,
+        mainChatId,
+        attachedImageIds,
+        createdAt: new Date(),
+      };
+      storage.messages.set(message.id, message);
+
+      // Get attached images
+      const attachedImages = attachedImageIds
+        .map((id) => storage.images.get(id))
+        .filter((img): img is Image => img !== undefined);
+
+      // Generate 4 placeholder images
+      const images: Image[] = [];
+      for (let i = 0; i < 4; i++) {
+        const seed = `${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
+        const image: Image = {
+          id: uuidv4(),
+          url: `https://picsum.photos/seed/${seed}/1792/1024`,
+          cloudinaryId: `mock-${seed}`,
+          messageId: message.id,
+          createdAt: new Date(),
+        };
+        storage.images.set(image.id, image);
+        images.push(image);
+
+        // Add to main chat's images
+        const mainChatImages = storage.mainChatImages.get(mainChat.id) || new Set();
+        mainChatImages.add(image.id);
+        storage.mainChatImages.set(mainChat.id, mainChatImages);
+      }
+
+      return { ...message, images, attachedImages };
+    },
   },
 
   // Images
   images: {
     async upload(
-      targetType: "frame" | "context" | "gallery",
+      targetType: "frame" | "context" | "gallery" | "mainChat",
       targetId: string,
       _file?: File // In real impl, this would be used
     ): Promise<Image> {
@@ -651,6 +840,12 @@ export const mockApi = {
           storage.galleryImages.set(targetId, galleryImages);
           break;
         }
+        case "mainChat": {
+          const mainChatImages = storage.mainChatImages.get(targetId) || new Set();
+          mainChatImages.add(image.id);
+          storage.mainChatImages.set(targetId, mainChatImages);
+          break;
+        }
       }
 
       return image;
@@ -669,7 +864,7 @@ export const mockApi = {
 
     async copy(
       imageId: string,
-      targetType: "frame" | "context" | "gallery",
+      targetType: "frame" | "context" | "gallery" | "mainChat",
       targetId: string
     ): Promise<boolean> {
       initializeMockData();
@@ -696,6 +891,12 @@ export const mockApi = {
           storage.galleryImages.set(targetId, galleryImages);
           break;
         }
+        case "mainChat": {
+          const mainChatImages = storage.mainChatImages.get(targetId) || new Set();
+          mainChatImages.add(imageId);
+          storage.mainChatImages.set(targetId, mainChatImages);
+          break;
+        }
       }
 
       return true;
@@ -703,9 +904,9 @@ export const mockApi = {
 
     async move(
       imageId: string,
-      sourceType: "frame" | "context" | "gallery",
+      sourceType: "frame" | "context" | "gallery" | "mainChat",
       sourceId: string,
-      targetType: "frame" | "context" | "gallery",
+      targetType: "frame" | "context" | "gallery" | "mainChat",
       targetId: string
     ): Promise<boolean> {
       initializeMockData();
@@ -722,7 +923,7 @@ export const mockApi = {
 
     async remove(
       imageId: string,
-      sourceType: "frame" | "context" | "gallery",
+      sourceType: "frame" | "context" | "gallery" | "mainChat",
       sourceId: string
     ): Promise<boolean> {
       initializeMockData();
@@ -755,6 +956,13 @@ export const mockApi = {
           }
           break;
         }
+        case "mainChat": {
+          const mainChatImages = storage.mainChatImages.get(sourceId);
+          if (mainChatImages) {
+            mainChatImages.delete(imageId);
+          }
+          break;
+        }
       }
 
       return true;
@@ -770,6 +978,9 @@ export const mockApi = {
       }
       for (const contextImages of storage.contextImages.values()) {
         contextImages.delete(imageId);
+      }
+      for (const mainChatImages of storage.mainChatImages.values()) {
+        mainChatImages.delete(imageId);
       }
       for (const galleryImages of storage.galleryImages.values()) {
         galleryImages.delete(imageId);
