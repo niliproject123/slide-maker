@@ -5,11 +5,6 @@ import {
   createVideoInternal,
   getVideoFrameCount,
   getVideoImageCount,
-  getContextMessageCount,
-  getContextImageCount,
-  getFrameImageCount,
-  getMainChatMessageCount,
-  getMainChatImageCount,
 } from "../services/mockStorage.js";
 import type { DeleteResponse, Image } from "../types/index.js";
 
@@ -141,6 +136,7 @@ export async function videoRoutes(fastify: FastifyInstance) {
         (c) => c.videoId === id
       );
 
+      // Build full frames with images and messages
       const frames = Array.from(storage.frames.values())
         .filter((f) => f.videoId === id)
         .sort((a, b) => a.order - b.order)
@@ -149,35 +145,97 @@ export async function videoRoutes(fastify: FastifyInstance) {
             ? storage.images.get(frame.selectedImageId) || null
             : null;
 
+          // Get frame images
+          const frameImageIds = storage.frameImages.get(frame.id) || new Set();
+          const images: Image[] = Array.from(frameImageIds)
+            .map((imgId) => storage.images.get(imgId))
+            .filter((img): img is Image => img !== undefined);
+
+          // Get frame messages with their images
+          const messages = Array.from(storage.messages.values())
+            .filter((m) => m.frameId === frame.id)
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+            .map((msg) => {
+              const msgImages = Array.from(storage.images.values()).filter(
+                (img) => img.messageId === msg.id
+              );
+              const attachedImages = msg.attachedImageIds
+                .map((imgId) => storage.images.get(imgId))
+                .filter((img): img is Image => img !== undefined);
+              return {
+                ...msg,
+                images: msgImages,
+                attachedImages,
+              };
+            });
+
           return {
             id: frame.id,
             title: frame.title,
             order: frame.order,
+            videoId: frame.videoId,
+            selectedImageId: frame.selectedImageId,
+            createdAt: frame.createdAt,
+            updatedAt: frame.updatedAt,
             selectedImage,
-            imageCount: getFrameImageCount(frame.id),
+            images,
+            messages,
           };
         });
 
+      // Build full mainChats with images and messages
       const mainChats = Array.from(storage.mainChats.values())
         .filter((mc) => mc.videoId === id)
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-        .map((mainChat) => ({
-          id: mainChat.id,
-          name: mainChat.name,
-          messageCount: getMainChatMessageCount(mainChat.id),
-          imageCount: getMainChatImageCount(mainChat.id),
-        }));
+        .map((mainChat) => {
+          // Get mainChat images
+          const mainChatImageIds = storage.mainChatImages.get(mainChat.id) || new Set();
+          const images: Image[] = Array.from(mainChatImageIds)
+            .map((imgId) => storage.images.get(imgId))
+            .filter((img): img is Image => img !== undefined);
+
+          // Get mainChat messages with their images
+          const messages = Array.from(storage.messages.values())
+            .filter((m) => m.mainChatId === mainChat.id)
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+            .map((msg) => {
+              const msgImages = Array.from(storage.images.values()).filter(
+                (img) => img.messageId === msg.id
+              );
+              const attachedImages = msg.attachedImageIds
+                .map((imgId) => storage.images.get(imgId))
+                .filter((img): img is Image => img !== undefined);
+              return {
+                ...msg,
+                images: msgImages,
+                attachedImages,
+              };
+            });
+
+          return {
+            id: mainChat.id,
+            name: mainChat.name,
+            videoId: mainChat.videoId,
+            createdAt: mainChat.createdAt,
+            updatedAt: mainChat.updatedAt,
+            images,
+            messages,
+          };
+        });
 
       return reply.send({
         id: video.id,
         name: video.name,
         projectId: video.projectId,
+        createdAt: video.createdAt,
+        updatedAt: video.updatedAt,
         context: context
           ? {
               id: context.id,
               content: context.content,
-              messageCount: getContextMessageCount(context.id),
-              imageCount: getContextImageCount(context.id),
+              videoId: context.videoId,
+              createdAt: context.createdAt,
+              updatedAt: context.updatedAt,
             }
           : null,
         frames,
