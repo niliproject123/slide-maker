@@ -41,6 +41,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { OpenAISettings } from "@/components/OpenAISettings";
 
 export default function VideoEditorPage() {
   const params = useParams();
@@ -769,6 +770,7 @@ export default function VideoEditorPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <OpenAISettings />
             <Link href={`/projects/${video.projectId}/gallery`}>
               <Button variant="outline" size="sm" className="h-8 px-2 sm:px-3">
                 <ImageIcon className="w-4 h-4" />

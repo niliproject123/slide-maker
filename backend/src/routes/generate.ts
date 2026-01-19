@@ -1,7 +1,13 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { v4 as uuidv4 } from "uuid";
 import { storage, initializeMockData } from "../services/mockStorage.js";
-import { generateImages, isOpenAIAvailable } from "../services/imageGeneration.js";
+import {
+  generateImages,
+  isOpenAIAvailable,
+  getOpenAIStatus,
+  testOpenAIConnection,
+  updateApiKey,
+} from "../services/imageGeneration.js";
 import type { Message, Image, MessageWithImages } from "../types/index.js";
 
 interface FrameIdParams {
@@ -23,14 +29,40 @@ interface GenerateContextBody {
   contextImageIds?: string[];
 }
 
+interface UpdateApiKeyBody {
+  apiKey: string | null;
+}
+
 export async function generateRoutes(fastify: FastifyInstance) {
-  // GET /generation/status - Check if OpenAI is available
+  // GET /generation/status - Get full OpenAI status including last test
   fastify.get("/generation/status", async (_request, reply) => {
-    return reply.send({
-      openaiAvailable: isOpenAIAvailable(),
-      mode: isOpenAIAvailable() ? "openai" : "mock",
-    });
+    const status = getOpenAIStatus();
+    return reply.send(status);
   });
+
+  // POST /generation/test - Run OpenAI connection test
+  fastify.post("/generation/test", async (_request, reply) => {
+    const result = await testOpenAIConnection("manual");
+    return reply.send(result);
+  });
+
+  // POST /generation/config - Update API key
+  fastify.post<{ Body: UpdateApiKeyBody }>(
+    "/generation/config",
+    async (request: FastifyRequest<{ Body: UpdateApiKeyBody }>, reply: FastifyReply) => {
+      const { apiKey } = request.body;
+      updateApiKey(apiKey);
+
+      // Run test after updating
+      const testResult = await testOpenAIConnection("manual");
+
+      return reply.send({
+        updated: true,
+        status: getOpenAIStatus(),
+        testResult,
+      });
+    }
+  );
 
   // POST /frames/:frameId/generate - Generate images for frame
   fastify.post<{ Params: FrameIdParams; Body: GenerateFrameBody }>(

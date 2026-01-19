@@ -16,6 +16,44 @@ import type {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+// OpenAI Status types
+export interface OpenAITestResult {
+  timestamp: string;
+  success: boolean;
+  mode: "openai" | "mock";
+  testType: "startup" | "manual";
+  details: {
+    apiKeySet: boolean;
+    apiKeyMasked: string | null;
+    connectionTest?: {
+      success: boolean;
+      error?: string;
+      responseTime?: number;
+    };
+    imageGenerationTest?: {
+      success: boolean;
+      error?: string;
+      imageUrl?: string;
+      responseTime?: number;
+    };
+  };
+  errors: string[];
+}
+
+export interface OpenAIStatus {
+  available: boolean;
+  mode: "openai" | "mock";
+  apiKeySet: boolean;
+  apiKeyMasked: string | null;
+  lastTest: OpenAITestResult | null;
+}
+
+export interface OpenAIConfigResponse {
+  updated: boolean;
+  status: OpenAIStatus;
+  testResult: OpenAITestResult;
+}
+
 async function fetchApi<T>(
   endpoint: string,
   options?: RequestInit
@@ -254,6 +292,22 @@ export const api = {
       return fetchApi<MessageWithImages>(`/main-chats/${mainChatId}/generate`, {
         method: "POST",
         body: JSON.stringify({ prompt, contextImageIds: attachedImageIds }),
+      });
+    },
+
+    // OpenAI status and configuration
+    async getStatus(): Promise<OpenAIStatus> {
+      return fetchApi<OpenAIStatus>("/generation/status");
+    },
+
+    async runTest(): Promise<OpenAITestResult> {
+      return fetchApi<OpenAITestResult>("/generation/test", { method: "POST" });
+    },
+
+    async updateConfig(apiKey: string | null): Promise<OpenAIConfigResponse> {
+      return fetchApi<OpenAIConfigResponse>("/generation/config", {
+        method: "POST",
+        body: JSON.stringify({ apiKey }),
       });
     },
   },

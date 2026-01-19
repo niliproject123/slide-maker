@@ -8,7 +8,7 @@ import { generateRoutes } from "./routes/generate.js";
 import { imageRoutes } from "./routes/images.js";
 import { galleryRoutes } from "./routes/gallery.js";
 import { mainChatRoutes } from "./routes/mainChats.js";
-import { isOpenAIAvailable } from "./services/imageGeneration.js";
+import { isOpenAIAvailable, runStartupTest, getOpenAIStatus } from "./services/imageGeneration.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -67,7 +67,10 @@ async function start() {
     await fastify.listen({ port: PORT, host: HOST });
     console.log(`\n🚀 Server running at http://localhost:${PORT}`);
     console.log(`📋 Health check: http://localhost:${PORT}/health`);
-    console.log(`🖼️  Image generation: ${isOpenAIAvailable() ? "OpenAI (real)" : "Mock (picsum)"}`);
+
+    // Run OpenAI startup test
+    await runStartupTest();
+
     console.log(`\n📝 API Endpoints:`);
     console.log(`   GET    /projects`);
     console.log(`   POST   /projects`);
@@ -91,6 +94,8 @@ async function start() {
     console.log(`   POST   /videos/:videoId/context/images`);
     console.log(`   DELETE /videos/:videoId/context/history`);
     console.log(`   GET    /generation/status`);
+    console.log(`   POST   /generation/test`);
+    console.log(`   POST   /generation/config`);
     console.log(`   POST   /frames/:frameId/generate`);
     console.log(`   POST   /videos/:videoId/context/generate`);
     console.log(`   POST   /main-chats/:mainChatId/generate`);
