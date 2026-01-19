@@ -9,7 +9,7 @@ interface ProjectIdParams {
   projectId: string;
 }
 
-type TargetType = "frame" | "context" | "gallery";
+type TargetType = "frame" | "context" | "gallery" | "mainChat";
 
 interface CopyBody {
   targetType: TargetType;
@@ -55,6 +55,14 @@ function addImageToTarget(imageId: string, targetType: TargetType, targetId: str
       storage.galleryImages.set(targetId, galleryImages);
       return true;
     }
+    case "mainChat": {
+      const mainChat = storage.mainChats.get(targetId);
+      if (!mainChat) return false;
+      const mainChatImages = storage.mainChatImages.get(targetId) || new Set();
+      mainChatImages.add(imageId);
+      storage.mainChatImages.set(targetId, mainChatImages);
+      return true;
+    }
   }
 }
 
@@ -86,6 +94,14 @@ function removeImageFromSource(imageId: string, sourceType: TargetType, sourceId
       const galleryImages = storage.galleryImages.get(sourceId);
       if (galleryImages) {
         galleryImages.delete(imageId);
+        return true;
+      }
+      return false;
+    }
+    case "mainChat": {
+      const mainChatImages = storage.mainChatImages.get(sourceId);
+      if (mainChatImages) {
+        mainChatImages.delete(imageId);
         return true;
       }
       return false;
@@ -199,6 +215,9 @@ export async function imageRoutes(fastify: FastifyInstance) {
       }
       for (const contextImages of storage.contextImages.values()) {
         contextImages.delete(id);
+      }
+      for (const mainChatImages of storage.mainChatImages.values()) {
+        mainChatImages.delete(id);
       }
       for (const galleryImages of storage.galleryImages.values()) {
         galleryImages.delete(id);

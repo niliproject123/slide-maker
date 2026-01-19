@@ -8,6 +8,8 @@ import {
   getContextMessageCount,
   getContextImageCount,
   getFrameImageCount,
+  getMainChatMessageCount,
+  getMainChatImageCount,
 } from "../services/mockStorage.js";
 import type { DeleteResponse, Image } from "../types/index.js";
 
@@ -93,6 +95,16 @@ export async function videoRoutes(fastify: FastifyInstance) {
         (c) => c.videoId === video.id
       );
 
+      // Get the created main chat
+      const mainChats = Array.from(storage.mainChats.values())
+        .filter((mc) => mc.videoId === video.id)
+        .map((mc) => ({
+          id: mc.id,
+          name: mc.name,
+          messageCount: 0,
+          imageCount: 0,
+        }));
+
       return reply.status(201).send({
         id: video.id,
         name: video.name,
@@ -104,6 +116,7 @@ export async function videoRoutes(fastify: FastifyInstance) {
             }
           : null,
         frames: [],
+        mainChats,
       });
     }
   );
@@ -145,6 +158,16 @@ export async function videoRoutes(fastify: FastifyInstance) {
           };
         });
 
+      const mainChats = Array.from(storage.mainChats.values())
+        .filter((mc) => mc.videoId === id)
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+        .map((mainChat) => ({
+          id: mainChat.id,
+          name: mainChat.name,
+          messageCount: getMainChatMessageCount(mainChat.id),
+          imageCount: getMainChatImageCount(mainChat.id),
+        }));
+
       return reply.send({
         id: video.id,
         name: video.name,
@@ -158,6 +181,7 @@ export async function videoRoutes(fastify: FastifyInstance) {
             }
           : null,
         frames,
+        mainChats,
       });
     }
   );
@@ -245,6 +269,31 @@ export async function videoRoutes(fastify: FastifyInstance) {
         }
         storage.frames.delete(frame.id);
         deletedFrames++;
+      }
+
+      // Delete main chats
+      const mainChats = Array.from(storage.mainChats.values()).filter(
+        (mc) => mc.videoId === id
+      );
+      for (const mainChat of mainChats) {
+        const mainChatImages = storage.mainChatImages.get(mainChat.id) || new Set();
+        deletedImages += mainChatImages.size;
+        storage.mainChatImages.delete(mainChat.id);
+
+        // Delete main chat messages
+        const mainChatMessages = Array.from(storage.messages.values()).filter(
+          (m) => m.mainChatId === mainChat.id
+        );
+        for (const msg of mainChatMessages) {
+          const images = Array.from(storage.images.values()).filter(
+            (img) => img.messageId === msg.id
+          );
+          for (const img of images) {
+            storage.images.delete(img.id);
+          }
+          storage.messages.delete(msg.id);
+        }
+        storage.mainChats.delete(mainChat.id);
       }
 
       // Delete context

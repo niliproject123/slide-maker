@@ -4,6 +4,7 @@ import type {
   Video,
   Context,
   Frame,
+  MainChat,
   Message,
   Image,
 } from "../types/index.js";
@@ -14,11 +15,13 @@ export const storage = {
   videos: new Map<string, Video>(),
   contexts: new Map<string, Context>(),
   frames: new Map<string, Frame>(),
+  mainChats: new Map<string, MainChat>(),
   messages: new Map<string, Message>(),
   images: new Map<string, Image>(),
   // Many-to-many relations
   frameImages: new Map<string, Set<string>>(), // frameId -> Set<imageId>
   contextImages: new Map<string, Set<string>>(), // contextId -> Set<imageId>
+  mainChatImages: new Map<string, Set<string>>(), // mainChatId -> Set<imageId>
   galleryImages: new Map<string, Set<string>>(), // projectId -> Set<imageId>
 };
 
@@ -72,7 +75,24 @@ export function createVideoInternal(projectId: string, name: string): Video {
   storage.contexts.set(context.id, context);
   storage.contextImages.set(context.id, new Set());
 
+  // Create default main chat for video
+  createMainChatInternal(video.id, "Main Chat");
+
   return video;
+}
+
+export function createMainChatInternal(videoId: string, name: string): MainChat {
+  const now = new Date();
+  const mainChat: MainChat = {
+    id: uuidv4(),
+    name,
+    videoId,
+    createdAt: now,
+    updatedAt: now,
+  };
+  storage.mainChats.set(mainChat.id, mainChat);
+  storage.mainChatImages.set(mainChat.id, new Set());
+  return mainChat;
 }
 
 export function createFrameInternal(videoId: string, title: string): Frame {
@@ -207,4 +227,15 @@ export function getContextMessageCount(contextId: string): number {
 export function getContextImageCount(contextId: string): number {
   const contextImages = storage.contextImages.get(contextId) || new Set();
   return contextImages.size;
+}
+
+export function getMainChatMessageCount(mainChatId: string): number {
+  return Array.from(storage.messages.values()).filter(
+    (m) => m.mainChatId === mainChatId
+  ).length;
+}
+
+export function getMainChatImageCount(mainChatId: string): number {
+  const mainChatImages = storage.mainChatImages.get(mainChatId) || new Set();
+  return mainChatImages.size;
 }

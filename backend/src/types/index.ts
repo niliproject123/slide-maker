@@ -33,12 +33,21 @@ export interface Frame {
   updatedAt: Date;
 }
 
+export interface MainChat {
+  id: string;
+  name: string;
+  videoId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Message {
   id: string;
   prompt: string;
   withContext: boolean;
   frameId: string | null;
   contextId: string | null;
+  mainChatId: string | null;
   attachedImageIds: string[];
   createdAt: Date;
 }
@@ -68,6 +77,14 @@ export interface VideoSummary {
 export interface VideoWithDetails extends Video {
   context: ContextSummary | null;
   frames: FrameSummary[];
+  mainChats: MainChatSummary[];
+}
+
+export interface MainChatSummary {
+  id: string;
+  name: string;
+  messageCount: number;
+  imageCount: number;
 }
 
 export interface ContextSummary {
@@ -88,6 +105,11 @@ export interface FrameSummary {
 export interface FrameWithImages extends Frame {
   images: Image[];
   selectedImage: Image | null;
+  messages: MessageWithImages[];
+}
+
+export interface MainChatWithImages extends MainChat {
+  images: Image[];
   messages: MessageWithImages[];
 }
 

@@ -63,6 +63,7 @@ export async function generateRoutes(fastify: FastifyInstance) {
         withContext,
         frameId,
         contextId: null,
+        mainChatId: null,
         attachedImageIds: contextImageIds,
         createdAt: new Date(),
       };
@@ -151,6 +152,7 @@ export async function generateRoutes(fastify: FastifyInstance) {
         withContext: false,
         frameId: null,
         contextId: context.id,
+        mainChatId: null,
         attachedImageIds: contextImageIds,
         createdAt: new Date(),
       };
@@ -222,6 +224,120 @@ export async function generateRoutes(fastify: FastifyInstance) {
       const frameImages = storage.frameImages.get(frameId) || new Set();
       frameImages.add(image.id);
       storage.frameImages.set(frameId, frameImages);
+
+      return reply.status(201).send(image);
+    }
+  );
+
+  // POST /main-chats/:mainChatId/generate - Generate images for main chat
+  fastify.post<{ Params: { mainChatId: string }; Body: GenerateContextBody }>(
+    "/main-chats/:mainChatId/generate",
+    async (
+      request: FastifyRequest<{ Params: { mainChatId: string }; Body: GenerateContextBody }>,
+      reply: FastifyReply
+    ) => {
+      initializeMockData();
+
+      const { mainChatId } = request.params;
+      const { prompt, contextImageIds = [] } = request.body;
+
+      const mainChat = storage.mainChats.get(mainChatId);
+      if (!mainChat) {
+        return reply.status(404).send({
+          error: "Main chat not found",
+          code: "NOT_FOUND",
+        });
+      }
+
+      if (!prompt || typeof prompt !== "string" || prompt.trim() === "") {
+        return reply.status(400).send({
+          error: "Prompt is required",
+          code: "VALIDATION_ERROR",
+        });
+      }
+
+      // Simulate generation time
+      await delay(500);
+
+      // Create message
+      const message: Message = {
+        id: uuidv4(),
+        prompt: prompt.trim(),
+        withContext: false,
+        frameId: null,
+        contextId: null,
+        mainChatId,
+        attachedImageIds: contextImageIds,
+        createdAt: new Date(),
+      };
+      storage.messages.set(message.id, message);
+
+      // Get attached images for the response
+      const attachedImages = contextImageIds
+        .map((id) => storage.images.get(id))
+        .filter((img): img is Image => img !== undefined);
+
+      // Generate 4 placeholder images
+      const images: Image[] = [];
+      for (let i = 0; i < 4; i++) {
+        const seed = `${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
+        const image: Image = {
+          id: uuidv4(),
+          url: `https://picsum.photos/seed/${seed}/1792/1024`,
+          cloudinaryId: `mock-${seed}`,
+          messageId: message.id,
+          createdAt: new Date(),
+        };
+        storage.images.set(image.id, image);
+        images.push(image);
+
+        // Add to main chat's images
+        const mainChatImages = storage.mainChatImages.get(mainChatId) || new Set();
+        mainChatImages.add(image.id);
+        storage.mainChatImages.set(mainChatId, mainChatImages);
+      }
+
+      const response: MessageWithImages = {
+        ...message,
+        images,
+        attachedImages,
+      };
+
+      return reply.status(201).send(response);
+    }
+  );
+
+  // POST /main-chats/:mainChatId/upload - Upload image to main chat (mock)
+  fastify.post<{ Params: { mainChatId: string } }>(
+    "/main-chats/:mainChatId/upload",
+    async (request: FastifyRequest<{ Params: { mainChatId: string } }>, reply: FastifyReply) => {
+      initializeMockData();
+
+      const { mainChatId } = request.params;
+
+      const mainChat = storage.mainChats.get(mainChatId);
+      if (!mainChat) {
+        return reply.status(404).send({
+          error: "Main chat not found",
+          code: "NOT_FOUND",
+        });
+      }
+
+      // Create a mock uploaded image
+      const seed = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const image: Image = {
+        id: uuidv4(),
+        url: `https://picsum.photos/seed/${seed}/1792/1024`,
+        cloudinaryId: `mock-upload-${seed}`,
+        messageId: null,
+        createdAt: new Date(),
+      };
+      storage.images.set(image.id, image);
+
+      // Add to main chat's images
+      const mainChatImages = storage.mainChatImages.get(mainChatId) || new Set();
+      mainChatImages.add(image.id);
+      storage.mainChatImages.set(mainChatId, mainChatImages);
 
       return reply.status(201).send(image);
     }

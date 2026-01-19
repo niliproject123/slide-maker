@@ -7,6 +7,7 @@ import { contextRoutes } from "./routes/context.js";
 import { generateRoutes } from "./routes/generate.js";
 import { imageRoutes } from "./routes/images.js";
 import { galleryRoutes } from "./routes/gallery.js";
+import { mainChatRoutes } from "./routes/mainChats.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -48,6 +49,7 @@ async function buildServer() {
   await fastify.register(generateRoutes);
   await fastify.register(imageRoutes);
   await fastify.register(galleryRoutes);
+  await fastify.register(mainChatRoutes);
 
   return fastify;
 }
