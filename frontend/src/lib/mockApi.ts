@@ -376,12 +376,48 @@ export const mockApi = {
         storage.frames.delete(frame.id);
       }
 
+      // Delete main chats
+      const mainChats = Array.from(storage.mainChats.values()).filter(
+        (mc) => mc.videoId === id
+      );
+      for (const mainChat of mainChats) {
+        storage.mainChatImages.delete(mainChat.id);
+        // Delete messages
+        const messages = Array.from(storage.messages.values()).filter(
+          (m) => m.mainChatId === mainChat.id
+        );
+        for (const msg of messages) {
+          // Delete images from this message
+          const images = Array.from(storage.images.values()).filter(
+            (img) => img.messageId === msg.id
+          );
+          for (const img of images) {
+            storage.images.delete(img.id);
+          }
+          storage.messages.delete(msg.id);
+        }
+        storage.mainChats.delete(mainChat.id);
+      }
+
       // Delete context
       const context = Array.from(storage.contexts.values()).find(
         (c) => c.videoId === id
       );
       if (context) {
         storage.contextImages.delete(context.id);
+        // Delete context messages
+        const contextMessages = Array.from(storage.messages.values()).filter(
+          (m) => m.contextId === context.id
+        );
+        for (const msg of contextMessages) {
+          const images = Array.from(storage.images.values()).filter(
+            (img) => img.messageId === msg.id
+          );
+          for (const img of images) {
+            storage.images.delete(img.id);
+          }
+          storage.messages.delete(msg.id);
+        }
         storage.contexts.delete(context.id);
       }
 

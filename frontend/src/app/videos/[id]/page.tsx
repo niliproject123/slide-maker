@@ -752,7 +752,11 @@ export default function VideoEditorPage() {
                         ? "bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800"
                         : "hover:bg-zinc-100 dark:hover:bg-zinc-900"
                     )}
-                    onClick={() => setSelectedFrameId(frame.id)}
+                    onClick={() => {
+                      setSelectedFrameId(frame.id);
+                      setMainView("frames");
+                      setSidebarOpen(false);
+                    }}
                   >
                     <GripVertical className="w-4 h-4 text-zinc-300 dark:text-zinc-700 mt-1 flex-shrink-0" />
 
