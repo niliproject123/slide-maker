@@ -159,6 +159,27 @@ npm run build
 
 ---
 
+## Railway Deployment
+
+### Backend Service
+- Root directory: `backend`
+- Build command: `npm install && npm run build`
+- Start command: `npm start`
+- Environment variables:
+  - `NODE_ENV=production`
+  - `PORT=4000` (Railway auto-assigns if not set)
+
+### Frontend Service
+- Root directory: `frontend`
+- Build command: `npm install && npm run build`
+- Start command: `npm start`
+- **Required environment variables:**
+  - `NEXT_PUBLIC_API_URL=https://<your-backend-service>.up.railway.app`
+
+**Important**: `NEXT_PUBLIC_*` variables are embedded at build time in Next.js. After adding/changing this variable, you must trigger a new deployment.
+
+---
+
 ## Notes
 
 - All "generate" endpoints return placeholder images from picsum.photos
