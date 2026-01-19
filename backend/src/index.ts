@@ -10,19 +10,22 @@ import { galleryRoutes } from "./routes/gallery.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const HOST = process.env.HOST || "0.0.0.0";
+const isProduction = process.env.NODE_ENV === "production";
 
 async function buildServer() {
   const fastify = Fastify({
-    logger: {
-      level: "info",
-      transport: {
-        target: "pino-pretty",
-        options: {
-          translateTime: "HH:MM:ss Z",
-          ignore: "pid,hostname",
+    logger: isProduction
+      ? true // JSON logs in production
+      : {
+          level: "info",
+          transport: {
+            target: "pino-pretty",
+            options: {
+              translateTime: "HH:MM:ss Z",
+              ignore: "pid,hostname",
+            },
+          },
         },
-      },
-    },
   });
 
   // Register CORS
