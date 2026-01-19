@@ -136,11 +136,11 @@ export const api = {
       });
     },
 
-    async update(id: string, title: string): Promise<Frame | null> {
+    async update(id: string, data: { title?: string; subtitle?: string }): Promise<Frame | null> {
       try {
         return await fetchApi<Frame>(`/frames/${id}`, {
           method: "PUT",
-          body: JSON.stringify({ title }),
+          body: JSON.stringify(data),
         });
       } catch {
         return null;

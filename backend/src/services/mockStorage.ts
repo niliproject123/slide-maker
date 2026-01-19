@@ -95,7 +95,7 @@ export function createMainChatInternal(videoId: string, name: string): MainChat 
   return mainChat;
 }
 
-export function createFrameInternal(videoId: string, title: string): Frame {
+export function createFrameInternal(videoId: string, title: string, subtitle: string = ""): Frame {
   const now = new Date();
   const frames = Array.from(storage.frames.values()).filter(
     (f) => f.videoId === videoId
@@ -103,6 +103,7 @@ export function createFrameInternal(videoId: string, title: string): Frame {
   const frame: Frame = {
     id: uuidv4(),
     title,
+    subtitle,
     order: frames.length,
     videoId,
     selectedImageId: null,

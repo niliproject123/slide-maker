@@ -18,10 +18,12 @@ interface FrameIdParams {
 
 interface CreateFrameBody {
   title: string;
+  subtitle?: string;
 }
 
 interface UpdateFrameBody {
-  title: string;
+  title?: string;
+  subtitle?: string;
 }
 
 interface ReorderBody {
@@ -60,6 +62,7 @@ export async function frameRoutes(fastify: FastifyInstance) {
           return {
             id: frame.id,
             title: frame.title,
+            subtitle: frame.subtitle,
             order: frame.order,
             selectedImage,
             imageCount: getFrameImageCount(frame.id),
@@ -80,7 +83,7 @@ export async function frameRoutes(fastify: FastifyInstance) {
       initializeMockData();
 
       const { videoId } = request.params;
-      const { title } = request.body;
+      const { title, subtitle } = request.body;
 
       const video = storage.videos.get(videoId);
       if (!video) {
@@ -97,11 +100,12 @@ export async function frameRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const frame = createFrameInternal(videoId, title.trim());
+      const frame = createFrameInternal(videoId, title.trim(), subtitle?.trim() || "");
 
       return reply.status(201).send({
         id: frame.id,
         title: frame.title,
+        subtitle: frame.subtitle,
         order: frame.order,
         selectedImage: null,
         imageCount: 0,
@@ -109,7 +113,7 @@ export async function frameRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // PUT /frames/:id - Update frame title
+  // PUT /frames/:id - Update frame title and/or subtitle
   fastify.put<{ Params: FrameIdParams; Body: UpdateFrameBody }>(
     "/frames/:id",
     async (
@@ -119,7 +123,7 @@ export async function frameRoutes(fastify: FastifyInstance) {
       initializeMockData();
 
       const { id } = request.params;
-      const { title } = request.body;
+      const { title, subtitle } = request.body;
       const frame = storage.frames.get(id);
 
       if (!frame) {
@@ -129,14 +133,28 @@ export async function frameRoutes(fastify: FastifyInstance) {
         });
       }
 
-      if (!title || typeof title !== "string" || title.trim() === "") {
+      // At least one field must be provided
+      if (title === undefined && subtitle === undefined) {
         return reply.status(400).send({
-          error: "Frame title is required",
+          error: "At least title or subtitle must be provided",
           code: "VALIDATION_ERROR",
         });
       }
 
-      frame.title = title.trim();
+      if (title !== undefined) {
+        if (typeof title !== "string" || title.trim() === "") {
+          return reply.status(400).send({
+            error: "Frame title cannot be empty",
+            code: "VALIDATION_ERROR",
+          });
+        }
+        frame.title = title.trim();
+      }
+
+      if (subtitle !== undefined) {
+        frame.subtitle = typeof subtitle === "string" ? subtitle.trim() : "";
+      }
+
       frame.updatedAt = new Date();
 
       const selectedImage = frame.selectedImageId
@@ -146,6 +164,7 @@ export async function frameRoutes(fastify: FastifyInstance) {
       return reply.send({
         id: frame.id,
         title: frame.title,
+        subtitle: frame.subtitle,
         order: frame.order,
         selectedImage,
         imageCount: getFrameImageCount(frame.id),
@@ -210,6 +229,7 @@ export async function frameRoutes(fastify: FastifyInstance) {
           return {
             id: f.id,
             title: f.title,
+            subtitle: f.subtitle,
             order: f.order,
             selectedImage,
             imageCount: getFrameImageCount(f.id),

@@ -27,6 +27,7 @@ import {
   ArrowRightLeft,
   MessageSquare,
   Menu,
+  Pencil,
 } from "lucide-react";
 import { mockApi } from "@/lib/mockApi";
 import type {
@@ -85,6 +86,7 @@ export default function VideoEditorPage() {
   // Copy to frame modal
   const [copyToFrameOpen, setCopyToFrameOpen] = useState(false);
   const [imageToCopy, setImageToCopy] = useState<ImageType | null>(null);
+  const [copyAndSelect, setCopyAndSelect] = useState(true);
 
   // Gallery images
   const [galleryImages, setGalleryImages] = useState<ImageType[]>([]);
@@ -100,6 +102,12 @@ export default function VideoEditorPage() {
 
   // Mobile sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Edit frame dialog
+  const [editFrameOpen, setEditFrameOpen] = useState(false);
+  const [editFrameTitle, setEditFrameTitle] = useState("");
+  const [editFrameSubtitle, setEditFrameSubtitle] = useState("");
+  const [savingFrame, setSavingFrame] = useState(false);
 
   // Chat scroll ref
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -222,6 +230,14 @@ export default function VideoEditorPage() {
     loadVideo();
   }
 
+  async function handleCopyAndSelectToFrame(imageId: string, targetFrameId: string) {
+    await mockApi.images.copy(imageId, "frame", targetFrameId);
+    await mockApi.images.select(targetFrameId, imageId);
+    setCopyToFrameOpen(false);
+    setImageToCopy(null);
+    loadVideo();
+  }
+
   function openCopyToFrameModal(image: ImageType) {
     setImageToCopy(image);
     setCopyToFrameOpen(true);
@@ -231,6 +247,25 @@ export default function VideoEditorPage() {
     setSavingContext(true);
     await mockApi.context.update(videoId, contextContent);
     setSavingContext(false);
+    loadVideo();
+  }
+
+  function openEditFrame() {
+    if (!selectedFrame) return;
+    setEditFrameTitle(selectedFrame.title);
+    setEditFrameSubtitle(selectedFrame.subtitle || "");
+    setEditFrameOpen(true);
+  }
+
+  async function handleSaveFrame() {
+    if (!selectedFrame || !editFrameTitle.trim()) return;
+    setSavingFrame(true);
+    await mockApi.frames.update(selectedFrame.id, {
+      title: editFrameTitle.trim(),
+      subtitle: editFrameSubtitle.trim(),
+    });
+    setSavingFrame(false);
+    setEditFrameOpen(false);
     loadVideo();
   }
 
@@ -474,6 +509,17 @@ export default function VideoEditorPage() {
                 <X className="w-4 h-4" />
               </Button>
             </div>
+            <div className="p-3 border-b border-zinc-200 dark:border-zinc-800">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={copyAndSelect}
+                  onChange={(e) => setCopyAndSelect(e.target.checked)}
+                  className="rounded"
+                />
+                <span>Set as frame's selected image</span>
+              </label>
+            </div>
             <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
               {video.frames.length === 0 ? (
                 <p className="text-center text-zinc-500 py-4">No frames available</p>
@@ -487,7 +533,10 @@ export default function VideoEditorPage() {
                         ? "bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800"
                         : "hover:bg-zinc-100 dark:hover:bg-zinc-900"
                     )}
-                    onClick={() => handleCopyToFrame(imageToCopy.id, frame.id)}
+                    onClick={() => copyAndSelect
+                      ? handleCopyAndSelectToFrame(imageToCopy.id, frame.id)
+                      : handleCopyToFrame(imageToCopy.id, frame.id)
+                    }
                   >
                     {frame.selectedImage ? (
                       <div className="w-12 h-8 rounded overflow-hidden flex-shrink-0">
@@ -505,7 +554,7 @@ export default function VideoEditorPage() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{frame.title}</p>
+                      <p className="text-sm font-medium">{frame.title}</p>
                       <p className="text-xs text-zinc-500">{frame.images.length} images</p>
                     </div>
                     {frame.id === selectedFrameId && (
@@ -635,6 +684,55 @@ export default function VideoEditorPage() {
                   Generate
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Frame Modal */}
+      {editFrameOpen && selectedFrame && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-0 sm:p-8">
+          <div className="bg-white dark:bg-zinc-950 sm:rounded-lg w-full h-full sm:h-auto sm:max-w-md flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="font-semibold">Edit Frame</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEditFrameOpen(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Title</label>
+                <Input
+                  value={editFrameTitle}
+                  onChange={(e) => setEditFrameTitle(e.target.value)}
+                  placeholder="Frame title"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Subtitle</label>
+                <Textarea
+                  value={editFrameSubtitle}
+                  onChange={(e) => setEditFrameSubtitle(e.target.value)}
+                  placeholder="Optional subtitle or description"
+                  className="min-h-[80px]"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditFrameOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveFrame}
+                disabled={savingFrame || !editFrameTitle.trim()}
+              >
+                {savingFrame && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save
+              </Button>
             </div>
           </div>
         </div>
@@ -784,9 +882,14 @@ export default function VideoEditorPage() {
                     )}
 
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
+                      <p className="text-sm font-medium break-words">
                         {index + 1}. {frame.title}
                       </p>
+                      {frame.subtitle && (
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 break-words">
+                          {frame.subtitle}
+                        </p>
+                      )}
                       <p className="text-xs text-zinc-400">
                         {frame.messages.length} prompts
                         {frame.selectedImage && (
@@ -1025,13 +1128,29 @@ export default function VideoEditorPage() {
               {/* Frame header */}
               <div className="flex-shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 sm:px-6 py-3 sm:py-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-base sm:text-lg font-semibold">{selectedFrame.title}</h2>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base sm:text-lg font-semibold">{selectedFrame.title}</h2>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={openEditFrame}
+                        title="Edit frame"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    {selectedFrame.subtitle && (
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-0.5">
+                        {selectedFrame.subtitle}
+                      </p>
+                    )}
                     <p className="text-xs sm:text-sm text-zinc-500">
                       {selectedFrame.messages.length} prompts, {selectedFrame.images.length} images
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <input
                       type="file"
                       ref={frameUploadRef}

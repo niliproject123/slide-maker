@@ -172,6 +172,7 @@ export async function videoRoutes(fastify: FastifyInstance) {
           return {
             id: frame.id,
             title: frame.title,
+            subtitle: frame.subtitle,
             order: frame.order,
             videoId: frame.videoId,
             selectedImageId: frame.selectedImageId,

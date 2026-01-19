@@ -107,10 +107,14 @@ This phase creates a Fastify API server that mirrors the frontend's `mockApi.ts`
 
 ## Future Phases
 
-### Phase 2.1 - Real OpenAI
-- [ ] Add OpenAI SDK
-- [ ] Implement actual image generation with gpt-image-1
-- [ ] Environment variable for API key
+### Phase 2.1 - Real OpenAI (COMPLETE)
+- [x] Add OpenAI SDK (`openai` package)
+- [x] Implement image generation service (`src/services/imageGeneration.ts`)
+- [x] Update generate routes to use the service
+- [x] Environment variable: `OPENAI_API_KEY`
+- [x] Automatic fallback to mock (picsum) if no API key
+- [x] Added `/generation/status` endpoint
+- [x] Health check shows OpenAI status
 
 ### Phase 2.2 - Real Cloudinary
 - [ ] Add Cloudinary SDK

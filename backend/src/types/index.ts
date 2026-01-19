@@ -26,6 +26,7 @@ export interface Context {
 export interface Frame {
   id: string;
   title: string;
+  subtitle: string;
   order: number;
   videoId: string;
   selectedImageId: string | null;
@@ -97,6 +98,7 @@ export interface ContextSummary {
 export interface FrameSummary {
   id: string;
   title: string;
+  subtitle: string;
   order: number;
   selectedImage: Image | null;
   imageCount: number;
