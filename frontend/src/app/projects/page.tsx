@@ -55,20 +55,20 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="min-h-screen p-8">
+    <div className="min-h-screen p-4 sm:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+            <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-zinc-100">
               Projects
             </h1>
-            <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+            <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-1">
               Manage your video projects
             </p>
           </div>
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger>
-              <Button>
+            <DialogTrigger asChild>
+              <Button className="w-full sm:w-auto">
                 <Plus className="w-4 h-4" />
                 New Project
               </Button>
@@ -123,42 +123,41 @@ export default function ProjectsPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
-              <Card
-                key={project.id}
-                className="group hover:shadow-md transition-shadow"
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <Link href={`/projects/${project.id}`} className="flex-1">
-                      <CardTitle className="text-lg hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+              <Link key={project.id} href={`/projects/${project.id}`} className="block">
+                <Card className="group hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardHeader className="pb-2 p-4 sm:p-6 sm:pb-2">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-base sm:text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate flex-1 min-w-0">
                         {project.name}
                       </CardTitle>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity -mt-1 -mr-2"
-                      onClick={() => handleDelete(project.id)}
-                      disabled={deletingId === project.id}
-                    >
-                      {deletingId === project.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      )}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Link href={`/projects/${project.id}`}>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mt-1 -mr-2 h-8 w-8"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDelete(project.id);
+                        }}
+                        disabled={deletingId === project.id}
+                      >
+                        {deletingId === project.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        )}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                    <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
                       Updated {formatRelativeTime(project.updatedAt)}
                     </p>
-                  </Link>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         )}

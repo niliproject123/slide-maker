@@ -76,24 +76,24 @@ export default function GalleryPage() {
   }
 
   return (
-    <div className="min-h-screen p-8">
+    <div className="min-h-screen p-4 sm:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <Link
             href={`/projects/${projectId}`}
             className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            {project.name}
+            <span className="truncate max-w-[200px]">{project.name}</span>
           </Link>
 
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-3">
-                <Images className="w-8 h-8" />
+              <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 sm:gap-3">
+                <Images className="w-6 h-6 sm:w-8 sm:h-8" />
                 Gallery
               </h1>
-              <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+              <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-1">
                 {images.length} {images.length === 1 ? "image" : "images"} saved
               </p>
             </div>
@@ -113,7 +113,7 @@ export default function GalleryPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
             {images.map((image) => (
               <div
                 key={image.id}
@@ -131,7 +131,7 @@ export default function GalleryPage() {
                   fill
                   className="object-cover"
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 sm:gap-2 opacity-0 group-hover:opacity-100">
                   <Button
                     size="sm"
                     variant="outline"
@@ -139,10 +139,10 @@ export default function GalleryPage() {
                       e.stopPropagation();
                       handleRemoveFromGallery(image.id);
                     }}
-                    className="bg-white/90"
+                    className="bg-white/90 h-7 px-2"
                   >
-                    <X className="w-4 h-4" />
-                    Remove
+                    <X className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline ml-1">Remove</span>
                   </Button>
                   <Button
                     size="sm"
@@ -151,8 +151,9 @@ export default function GalleryPage() {
                       e.stopPropagation();
                       handleDeleteImage(image.id);
                     }}
+                    className="h-7 px-2"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
                 </div>
               </div>
@@ -163,11 +164,11 @@ export default function GalleryPage() {
         {/* Image preview modal */}
         {selectedImage && (
           <div
-            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8"
+            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-0 sm:p-8"
             onClick={() => setSelectedImage(null)}
           >
             <div
-              className="relative max-w-5xl w-full aspect-video"
+              className="relative w-full h-full sm:max-w-5xl sm:h-auto sm:aspect-video"
               onClick={(e) => e.stopPropagation()}
             >
               <Image
@@ -179,30 +180,35 @@ export default function GalleryPage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="absolute top-4 right-4 bg-white/90"
+                className="absolute top-4 right-4 bg-white/90 h-8 w-8 sm:h-10 sm:w-10"
                 onClick={() => setSelectedImage(null)}
               >
                 <X className="w-4 h-4" />
               </Button>
-              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center">
-                <p className="text-white text-sm">
+              <div className="absolute bottom-4 left-4 right-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <p className="text-white text-xs sm:text-sm">
                   Created: {new Date(selectedImage.createdAt).toLocaleString()}
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={() => handleRemoveFromGallery(selectedImage.id)}
-                    className="bg-white/90"
+                    className="bg-white/90 h-8"
                   >
                     <X className="w-4 h-4" />
-                    Remove from Gallery
+                    <span className="hidden sm:inline ml-1">Remove from Gallery</span>
+                    <span className="sm:hidden ml-1">Remove</span>
                   </Button>
                   <Button
                     variant="destructive"
+                    size="sm"
                     onClick={() => handleDeleteImage(selectedImage.id)}
+                    className="h-8"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Delete Permanently
+                    <span className="hidden sm:inline ml-1">Delete Permanently</span>
+                    <span className="sm:hidden ml-1">Delete</span>
                   </Button>
                 </div>
               </div>

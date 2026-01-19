@@ -107,9 +107,9 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <div className="min-h-screen p-8">
+    <div className="min-h-screen p-4 sm:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <Link
             href="/projects"
             className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 mb-4"
@@ -118,10 +118,10 @@ export default function ProjectDetailPage() {
             Projects
           </Link>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2 min-w-0">
               {editingName ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   <Input
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
@@ -132,15 +132,16 @@ export default function ProjectDetailPage() {
                         setProjectName(project.name);
                       }
                     }}
-                    className="text-2xl font-bold h-auto py-1"
+                    className="text-xl sm:text-2xl font-bold h-auto py-1"
                     autoFocus
                   />
-                  <Button size="icon" variant="ghost" onClick={handleUpdateProjectName}>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0" onClick={handleUpdateProjectName}>
                     <Check className="w-4 h-4" />
                   </Button>
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-8 w-8 flex-shrink-0"
                     onClick={() => {
                       setEditingName(false);
                       setProjectName(project.name);
@@ -151,12 +152,13 @@ export default function ProjectDetailPage() {
                 </div>
               ) : (
                 <>
-                  <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-zinc-100 truncate">
                     {project.name}
                   </h1>
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-8 w-8 flex-shrink-0"
                     onClick={() => setEditingName(true)}
                   >
                     <Edit2 className="w-4 h-4" />
@@ -164,11 +166,11 @@ export default function ProjectDetailPage() {
                 </>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Link href={`/projects/${projectId}/gallery`}>
-                <Button variant="outline">
+                <Button variant="outline" size="sm" className="h-9">
                   <Images className="w-4 h-4" />
-                  Gallery
+                  <span className="hidden sm:inline ml-1">Gallery</span>
                   {project.galleryImages.length > 0 && (
                     <span className="ml-1 bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 rounded text-xs">
                       {project.galleryImages.length}
@@ -177,10 +179,11 @@ export default function ProjectDetailPage() {
                 </Button>
               </Link>
               <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogTrigger>
-                  <Button>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="h-9">
                     <Plus className="w-4 h-4" />
-                    New Video
+                    <span className="hidden sm:inline ml-1">New Video</span>
+                    <span className="sm:hidden ml-1">New</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -231,43 +234,42 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {project.videos.map((video) => (
-              <Card
-                key={video.id}
-                className="group hover:shadow-md transition-shadow"
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <Link href={`/videos/${video.id}`} className="flex-1">
-                      <CardTitle className="text-lg hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2">
-                        <Video className="w-4 h-4" />
-                        {video.name}
+              <Link key={video.id} href={`/videos/${video.id}`} className="block">
+                <Card className="group hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardHeader className="pb-2 p-4 sm:p-6 sm:pb-2">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-base sm:text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-2 flex-1 min-w-0">
+                        <Video className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">{video.name}</span>
                       </CardTitle>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity -mt-1 -mr-2"
-                      onClick={() => handleDeleteVideo(video.id)}
-                      disabled={deletingId === video.id}
-                    >
-                      {deletingId === video.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      )}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Link href={`/videos/${video.id}`}>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mt-1 -mr-2 h-8 w-8"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeleteVideo(video.id);
+                        }}
+                        disabled={deletingId === video.id}
+                      >
+                        {deletingId === video.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        )}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                    <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
                       Updated {formatRelativeTime(video.updatedAt)}
                     </p>
-                  </Link>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         )}
