@@ -125,40 +125,39 @@ export default function ProjectsPage() {
         ) : (
           <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
-              <Card
-                key={project.id}
-                className="group hover:shadow-md transition-shadow"
-              >
-                <CardHeader className="pb-2 p-4 sm:p-6 sm:pb-2">
-                  <div className="flex items-start justify-between">
-                    <Link href={`/projects/${project.id}`} className="flex-1 min-w-0">
-                      <CardTitle className="text-base sm:text-lg hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate">
+              <Link key={project.id} href={`/projects/${project.id}`} className="block">
+                <Card className="group hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardHeader className="pb-2 p-4 sm:p-6 sm:pb-2">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-base sm:text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate flex-1 min-w-0">
                         {project.name}
                       </CardTitle>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mt-1 -mr-2 h-8 w-8"
-                      onClick={() => handleDelete(project.id)}
-                      disabled={deletingId === project.id}
-                    >
-                      {deletingId === project.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      )}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-                  <Link href={`/projects/${project.id}`}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mt-1 -mr-2 h-8 w-8"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDelete(project.id);
+                        }}
+                        disabled={deletingId === project.id}
+                      >
+                        {deletingId === project.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        )}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                     <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
                       Updated {formatRelativeTime(project.updatedAt)}
                     </p>
-                  </Link>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         )}

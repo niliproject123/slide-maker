@@ -316,7 +316,7 @@ export default function VideoEditorPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* Fullscreen Image Viewer */}
       {fullscreenImage && (
         <div

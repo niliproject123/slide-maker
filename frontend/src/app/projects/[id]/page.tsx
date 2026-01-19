@@ -236,41 +236,40 @@ export default function ProjectDetailPage() {
         ) : (
           <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {project.videos.map((video) => (
-              <Card
-                key={video.id}
-                className="group hover:shadow-md transition-shadow"
-              >
-                <CardHeader className="pb-2 p-4 sm:p-6 sm:pb-2">
-                  <div className="flex items-start justify-between">
-                    <Link href={`/videos/${video.id}`} className="flex-1 min-w-0">
-                      <CardTitle className="text-base sm:text-lg hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2">
+              <Link key={video.id} href={`/videos/${video.id}`} className="block">
+                <Card className="group hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardHeader className="pb-2 p-4 sm:p-6 sm:pb-2">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-base sm:text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-2 flex-1 min-w-0">
                         <Video className="w-4 h-4 flex-shrink-0" />
                         <span className="truncate">{video.name}</span>
                       </CardTitle>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mt-1 -mr-2 h-8 w-8"
-                      onClick={() => handleDeleteVideo(video.id)}
-                      disabled={deletingId === video.id}
-                    >
-                      {deletingId === video.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      )}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-                  <Link href={`/videos/${video.id}`}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mt-1 -mr-2 h-8 w-8"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeleteVideo(video.id);
+                        }}
+                        disabled={deletingId === video.id}
+                      >
+                        {deletingId === video.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        )}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                     <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
                       Updated {formatRelativeTime(video.updatedAt)}
                     </p>
-                  </Link>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         )}
