@@ -26,10 +26,10 @@ Adding two major features:
 ### Main Chat Feature
 - [x] Add MainChat types to types.ts
 - [x] Add MainChat operations to mockApi.ts
-- [ ] Add Main Chat tab/view to video editor
-- [ ] Add "Copy to Frame" from Main Chat images
-- [ ] Add image attachment picker for Main Chat
-- [ ] Add multiple Main Chats support
+- [x] Add Main Chat tab/view to video editor
+- [x] Add "Copy to Frame" from Main Chat images
+- [x] Add image attachment picker for Main Chat
+- [ ] Add multiple Main Chats support (create/delete UI)
 
 ### Mobile Responsiveness
 - [ ] Video Editor page responsive layout
@@ -153,7 +153,13 @@ Frame selector = dropdown/bottom sheet
 - Updated 04-FRONTEND-video-maker.md with current state
 - Added MainChat types and mobile responsiveness docs
 - Created this progress file
-- Starting implementation...
+- Added MainChat types to types.ts
+- Added MainChat operations to mockApi.ts (create, delete, list, generate)
+- Added Main Chat tab/view to video editor with tab switching
+- Added "Copy to Frame" functionality from Main Chat images
+- Added image attachment picker for Main Chat
+- Build passes, all tests pass
+- Starting mobile responsiveness...
 
 ---
 
