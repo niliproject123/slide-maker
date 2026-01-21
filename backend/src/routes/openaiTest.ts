@@ -60,7 +60,7 @@ export async function openaiTestRoutes(fastify: FastifyInstance) {
 
       // Test 2: Image generation (without input image)
       const test2: TestResult = {
-        test: "2. Image Generation (DALL-E, no input image)",
+        test: "2. Image Generation (DALL-E, text prompt only)",
         status: "pending",
       };
       results.push(test2);
@@ -89,44 +89,44 @@ export async function openaiTestRoutes(fastify: FastifyInstance) {
         test2.error = err instanceof Error ? err.message : String(err);
       }
 
-      // Test 3: Vision - Text response with image input
+      // Test 3: Vision - Describe an image (image in → text out)
       const test3: TestResult = {
-        test: "3. Vision (Chat with image input)",
+        test: "3. Vision: Describe Image (image → text)",
         status: "pending",
       };
       results.push(test3);
 
+      const inputImageUrl3 = "https://picsum.photos/id/237/400/400";
+
       try {
         const start = Date.now();
-        const visionRequest = {
+        test3.request = {
+          model: "gpt-4o-mini",
+          prompt: "Describe this image in detail.",
+          input_image_url: inputImageUrl3,
+        };
+
+        const visionResponse = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "user" as const,
               content: [
-                { type: "text" as const, text: "What color is the main shape in this image? Reply in one word." },
+                { type: "text" as const, text: "Describe this image in detail. What do you see?" },
                 {
                   type: "image_url" as const,
-                  image_url: {
-                    url: "https://placehold.co/200x200/0000FF/0000FF.png"
-                  }
+                  image_url: { url: inputImageUrl3 }
                 },
               ],
             }
           ],
-          max_tokens: 50,
-        };
-        test3.request = {
-          ...visionRequest,
-          messages: [{ role: "user", content: "[text + image_url: blue square from placehold.co]" }],
-          _note: "Asking about a solid blue image",
-        };
+          max_tokens: 200,
+        });
 
-        const visionResponse = await openai.chat.completions.create(visionRequest);
         test3.response = {
-          content: visionResponse.choices[0]?.message?.content,
+          input_image_url: inputImageUrl3,
+          description: visionResponse.choices[0]?.message?.content,
           model: visionResponse.model,
-          usage: visionResponse.usage,
         };
         test3.status = "success";
         test3.duration = Date.now() - start;
@@ -135,56 +135,65 @@ export async function openaiTestRoutes(fastify: FastifyInstance) {
         test3.error = err instanceof Error ? err.message : String(err);
       }
 
-      // Test 4: Image edit/variation with input image (using gpt-image-1 if available, or describe alternative)
+      // Test 4: Image Modification - Take image, request change, generate new (image → image)
       const test4: TestResult = {
-        test: "4. Image Generation with reference (GPT-4o vision + DALL-E)",
+        test: "4. Image Modification: Change Image (image → new image)",
         status: "pending",
       };
       results.push(test4);
 
+      const inputImageUrl4 = "https://picsum.photos/id/1025/400/400"; // A dog
+
       try {
         const start = Date.now();
-        // First, use vision to describe an image, then generate based on that
-        const describeRequest = {
+
+        // Step 1: Analyze the input image
+        const analyzeResponse = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "user" as const,
               content: [
-                { type: "text" as const, text: "Describe this image in 10 words for an image generation prompt." },
+                {
+                  type: "text" as const,
+                  text: "Describe this image briefly for an image generation prompt (max 20 words). Focus on the main subject."
+                },
                 {
                   type: "image_url" as const,
-                  image_url: {
-                    url: "https://picsum.photos/id/237/200/200"
-                  }
+                  image_url: { url: inputImageUrl4 }
                 },
               ],
             }
           ],
           max_tokens: 50,
-        };
+        });
 
-        const describeResponse = await openai.chat.completions.create(describeRequest);
-        const description = describeResponse.choices[0]?.message?.content || "an ant";
+        const originalDescription = analyzeResponse.choices[0]?.message?.content || "a dog";
 
-        const generateRequest = {
+        // Step 2: Generate modified version
+        const modificationPrompt = `${originalDescription}, but make it a cartoon/illustration style with vibrant colors`;
+
+        const generateResponse = await openai.images.generate({
           model: "dall-e-3" as const,
-          prompt: `Based on reference: ${description}. Create a simple artistic interpretation.`,
+          prompt: modificationPrompt,
           n: 1,
           size: "1024x1024" as const,
           quality: "standard" as const,
-        };
+        });
+
+        const generatedData = generateResponse.data?.[0];
 
         test4.request = {
-          step1_describe: { model: "gpt-4o-mini", input_image: "picsum dog photo" },
-          step2_generate: generateRequest,
+          input_image_url: inputImageUrl4,
+          modification: "Convert to cartoon/illustration style",
+          steps: ["1. Analyze input image", "2. Generate modified version"],
         };
 
-        const generateResponse = await openai.images.generate(generateRequest);
-        const generatedData = generateResponse.data?.[0];
         test4.response = {
-          description_from_image: description,
-          generated_url: generatedData?.url,
+          input_image_url: inputImageUrl4,
+          original_description: originalDescription,
+          modification_prompt: modificationPrompt,
+          output_image_url: generatedData?.url,
           revised_prompt: generatedData?.revised_prompt,
         };
         test4.status = "success";

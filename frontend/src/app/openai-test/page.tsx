@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 interface TestResult {
   test: string;
   status: "pending" | "success" | "error";
-  request?: unknown;
-  response?: unknown;
+  request?: Record<string, unknown>;
+  response?: Record<string, unknown>;
   error?: string;
   duration?: number;
 }
@@ -60,17 +60,36 @@ export default function OpenAITestPage() {
     }
   };
 
-  const getImageUrl = (response: unknown): string | null => {
-    if (!response || typeof response !== "object") return null;
-    const resp = response as Record<string, unknown>;
-    if (typeof resp.url === "string") return resp.url;
-    if (typeof resp.generated_url === "string") return resp.generated_url;
-    return null;
+  const getImageUrls = (result: TestResult): { input?: string; output?: string } => {
+    const urls: { input?: string; output?: string } = {};
+
+    // Check request for input image
+    if (result.request?.input_image_url) {
+      urls.input = result.request.input_image_url as string;
+    }
+
+    // Check response for images
+    if (result.response) {
+      if (result.response.input_image_url) {
+        urls.input = result.response.input_image_url as string;
+      }
+      if (result.response.url) {
+        urls.output = result.response.url as string;
+      }
+      if (result.response.output_image_url) {
+        urls.output = result.response.output_image_url as string;
+      }
+      if (result.response.generated_url) {
+        urls.output = result.response.generated_url as string;
+      }
+    }
+
+    return urls;
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">OpenAI API Test</h1>
         <p className="text-gray-400 mb-8">
           Testing OpenAI integration on page load
@@ -122,64 +141,84 @@ export default function OpenAITestPage() {
             </div>
 
             <div className="space-y-6">
-              {data.results.map((result, index) => (
-                <div
-                  key={index}
-                  className={`bg-gray-800 rounded-lg p-4 border ${
-                    result.status === "success"
-                      ? "border-green-500/30"
-                      : result.status === "error"
-                      ? "border-red-500/30"
-                      : "border-gray-700"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    {getStatusIcon(result.status)}
-                    <h3 className="text-lg font-semibold">{result.test}</h3>
-                    {result.duration && (
-                      <span className="text-gray-500 text-sm ml-auto">
-                        {(result.duration / 1000).toFixed(1)}s
-                      </span>
+              {data.results.map((result, index) => {
+                const imageUrls = getImageUrls(result);
+
+                return (
+                  <div
+                    key={index}
+                    className={`bg-gray-800 rounded-lg p-4 border ${
+                      result.status === "success"
+                        ? "border-green-500/30"
+                        : result.status === "error"
+                        ? "border-red-500/30"
+                        : "border-gray-700"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      {getStatusIcon(result.status)}
+                      <h3 className="text-lg font-semibold">{result.test}</h3>
+                      {result.duration && (
+                        <span className="text-gray-500 text-sm ml-auto">
+                          {(result.duration / 1000).toFixed(1)}s
+                        </span>
+                      )}
+                    </div>
+
+                    {result.error && (
+                      <div className="bg-red-900/30 rounded p-3 mb-3">
+                        <span className="text-red-400 font-mono text-sm">
+                          {result.error}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="text-gray-400 text-sm mb-1">Request</h4>
+                        <pre className="bg-gray-900 rounded p-3 text-xs overflow-auto max-h-48">
+                          {JSON.stringify(result.request, null, 2)}
+                        </pre>
+                      </div>
+                      <div>
+                        <h4 className="text-gray-400 text-sm mb-1">Response</h4>
+                        <pre className="bg-gray-900 rounded p-3 text-xs overflow-auto max-h-48">
+                          {JSON.stringify(result.response, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+
+                    {(imageUrls.input || imageUrls.output) && (
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {imageUrls.input && (
+                          <div>
+                            <h4 className="text-gray-400 text-sm mb-2">
+                              Input Image
+                            </h4>
+                            <img
+                              src={imageUrls.input}
+                              alt="Input"
+                              className="rounded-lg max-w-full border border-gray-700"
+                            />
+                          </div>
+                        )}
+                        {imageUrls.output && (
+                          <div>
+                            <h4 className="text-gray-400 text-sm mb-2">
+                              Output Image
+                            </h4>
+                            <img
+                              src={imageUrls.output}
+                              alt="Output"
+                              className="rounded-lg max-w-full border border-gray-700"
+                            />
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
-
-                  {result.error && (
-                    <div className="bg-red-900/30 rounded p-3 mb-3">
-                      <span className="text-red-400 font-mono text-sm">
-                        {result.error}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="text-gray-400 text-sm mb-1">Request</h4>
-                      <pre className="bg-gray-900 rounded p-3 text-xs overflow-auto max-h-48">
-                        {JSON.stringify(result.request, null, 2)}
-                      </pre>
-                    </div>
-                    <div>
-                      <h4 className="text-gray-400 text-sm mb-1">Response</h4>
-                      <pre className="bg-gray-900 rounded p-3 text-xs overflow-auto max-h-48">
-                        {JSON.stringify(result.response, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-
-                  {getImageUrl(result.response) && (
-                    <div className="mt-4">
-                      <h4 className="text-gray-400 text-sm mb-2">
-                        Generated Image
-                      </h4>
-                      <img
-                        src={getImageUrl(result.response)!}
-                        alt="Generated"
-                        className="rounded-lg max-w-md border border-gray-700"
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
