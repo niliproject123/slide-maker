@@ -77,9 +77,10 @@ export async function openaiTestRoutes(fastify: FastifyInstance) {
         test2.request = imageRequest;
 
         const imageResponse = await openai.images.generate(imageRequest);
+        const imageData = imageResponse.data?.[0];
         test2.response = {
-          url: imageResponse.data[0]?.url,
-          revised_prompt: imageResponse.data[0]?.revised_prompt,
+          url: imageData?.url,
+          revised_prompt: imageData?.revised_prompt,
         };
         test2.status = "success";
         test2.duration = Date.now() - start;
@@ -180,10 +181,11 @@ export async function openaiTestRoutes(fastify: FastifyInstance) {
         };
 
         const generateResponse = await openai.images.generate(generateRequest);
+        const generatedData = generateResponse.data?.[0];
         test4.response = {
           description_from_image: description,
-          generated_url: generateResponse.data[0]?.url,
-          revised_prompt: generateResponse.data[0]?.revised_prompt,
+          generated_url: generatedData?.url,
+          revised_prompt: generatedData?.revised_prompt,
         };
         test4.status = "success";
         test4.duration = Date.now() - start;

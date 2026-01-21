@@ -8,6 +8,7 @@ import { generateRoutes } from "./routes/generate.js";
 import { imageRoutes } from "./routes/images.js";
 import { galleryRoutes } from "./routes/gallery.js";
 import { mainChatRoutes } from "./routes/mainChats.js";
+import { openaiTestRoutes } from "./routes/openaiTest.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -50,6 +51,7 @@ async function buildServer() {
   await fastify.register(imageRoutes);
   await fastify.register(galleryRoutes);
   await fastify.register(mainChatRoutes);
+  await fastify.register(openaiTestRoutes);
 
   return fastify;
 }
