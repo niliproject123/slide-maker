@@ -9,6 +9,8 @@ import { imageRoutes } from "./routes/images.js";
 import { galleryRoutes } from "./routes/gallery.js";
 import { mainChatRoutes } from "./routes/mainChats.js";
 import { openaiTestRoutes } from "./routes/openaiTest.js";
+import { modelsRoutes } from "./routes/models.js";
+import { characterRoutes } from "./routes/characters.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -52,6 +54,8 @@ async function buildServer() {
   await fastify.register(galleryRoutes);
   await fastify.register(mainChatRoutes);
   await fastify.register(openaiTestRoutes);
+  await fastify.register(modelsRoutes);
+  await fastify.register(characterRoutes);
 
   return fastify;
 }
@@ -97,6 +101,15 @@ async function start() {
     console.log(`   POST   /projects/:projectId/gallery`);
     console.log(`   DELETE /projects/:projectId/gallery/:imageId`);
     console.log(`   POST   /projects/:projectId/gallery/upload`);
+    console.log(`   GET    /models`);
+    console.log(`   GET    /models/:modelId`);
+    console.log(`   GET    /projects/:projectId/characters`);
+    console.log(`   POST   /projects/:projectId/characters`);
+    console.log(`   GET    /characters/:characterId`);
+    console.log(`   PATCH  /characters/:characterId`);
+    console.log(`   DELETE /characters/:characterId`);
+    console.log(`   POST   /characters/:characterId/images`);
+    console.log(`   DELETE /characters/:characterId/images/:imageId`);
     console.log(`\n`);
   } catch (err) {
     fastify.log.error(err);

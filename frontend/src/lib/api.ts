@@ -12,6 +12,9 @@ import type {
   MainChatWithMessages,
   MessageWithImages,
   ContextWithImages,
+  CharacterWithImages,
+  ModelInfo,
+  ModelsResponse,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -226,34 +229,56 @@ export const api = {
       frameId: string,
       prompt: string,
       withContext: boolean = false,
-      attachedImageIds: string[] = []
+      attachedImageIds: string[] = [],
+      options?: { model?: string; ipAdapterScale?: number; seed?: number }
     ): Promise<MessageWithImages> {
       return fetchApi<MessageWithImages>(`/frames/${frameId}/generate`, {
         method: "POST",
-        body: JSON.stringify({ prompt, withContext, contextImageIds: attachedImageIds }),
+        body: JSON.stringify({
+          prompt,
+          withContext,
+          contextImageIds: attachedImageIds,
+          model: options?.model,
+          ipAdapterScale: options?.ipAdapterScale,
+          seed: options?.seed,
+        }),
       });
     },
 
     async contextImages(
       contextId: string,
       prompt: string,
-      attachedImageIds: string[] = []
+      attachedImageIds: string[] = [],
+      options?: { model?: string; ipAdapterScale?: number; seed?: number }
     ): Promise<MessageWithImages> {
       // contextId is actually videoId for the API
       return fetchApi<MessageWithImages>(`/videos/${contextId}/context/generate`, {
         method: "POST",
-        body: JSON.stringify({ prompt, contextImageIds: attachedImageIds }),
+        body: JSON.stringify({
+          prompt,
+          contextImageIds: attachedImageIds,
+          model: options?.model,
+          ipAdapterScale: options?.ipAdapterScale,
+          seed: options?.seed,
+        }),
       });
     },
 
     async mainChatImages(
       mainChatId: string,
       prompt: string,
-      attachedImageIds: string[] = []
+      attachedImageIds: string[] = [],
+      options?: { model?: string; ipAdapterScale?: number; seed?: number }
     ): Promise<MessageWithImages> {
       return fetchApi<MessageWithImages>(`/main-chats/${mainChatId}/generate`, {
         method: "POST",
-        body: JSON.stringify({ prompt, contextImageIds: attachedImageIds }),
+        body: JSON.stringify({
+          prompt,
+          contextImageIds: attachedImageIds,
+          model: options?.model,
+          ipAdapterScale: options?.ipAdapterScale,
+          seed: options?.seed,
+        }),
       });
     },
   },
@@ -371,6 +396,95 @@ export const api = {
 
     async removeImage(projectId: string, imageId: string): Promise<boolean> {
       return api.images.remove(imageId, "gallery", projectId);
+    },
+  },
+
+  // Models
+  models: {
+    async list(): Promise<ModelsResponse> {
+      return fetchApi<ModelsResponse>("/models");
+    },
+
+    async get(modelId: string): Promise<ModelInfo | null> {
+      try {
+        return await fetchApi<ModelInfo>(`/models/${modelId}`);
+      } catch {
+        return null;
+      }
+    },
+  },
+
+  // Characters
+  characters: {
+    async list(projectId: string): Promise<CharacterWithImages[]> {
+      return fetchApi<CharacterWithImages[]>(`/projects/${projectId}/characters`);
+    },
+
+    async get(characterId: string): Promise<CharacterWithImages | null> {
+      try {
+        return await fetchApi<CharacterWithImages>(`/characters/${characterId}`);
+      } catch {
+        return null;
+      }
+    },
+
+    async create(
+      projectId: string,
+      name: string,
+      description: string = ""
+    ): Promise<CharacterWithImages> {
+      return fetchApi<CharacterWithImages>(`/projects/${projectId}/characters`, {
+        method: "POST",
+        body: JSON.stringify({ name, description }),
+      });
+    },
+
+    async update(
+      characterId: string,
+      data: { name?: string; description?: string }
+    ): Promise<CharacterWithImages | null> {
+      try {
+        return await fetchApi<CharacterWithImages>(`/characters/${characterId}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        });
+      } catch {
+        return null;
+      }
+    },
+
+    async delete(characterId: string): Promise<boolean> {
+      try {
+        await fetchApi(`/characters/${characterId}`, { method: "DELETE" });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    async addImage(
+      characterId: string,
+      imageIdOrUrl: { imageId?: string; imageUrl?: string }
+    ): Promise<Image | null> {
+      try {
+        return await fetchApi<Image>(`/characters/${characterId}/images`, {
+          method: "POST",
+          body: JSON.stringify(imageIdOrUrl),
+        });
+      } catch {
+        return null;
+      }
+    },
+
+    async removeImage(characterId: string, imageId: string): Promise<boolean> {
+      try {
+        await fetchApi(`/characters/${characterId}/images/${imageId}`, {
+          method: "DELETE",
+        });
+        return true;
+      } catch {
+        return false;
+      }
     },
   },
 };

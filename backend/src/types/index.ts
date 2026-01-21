@@ -60,6 +60,19 @@ export interface Image {
   createdAt: Date;
 }
 
+export interface Character {
+  id: string;
+  name: string;
+  description: string;
+  projectId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CharacterWithImages extends Character {
+  referenceImages: Image[];
+}
+
 // Extended types with relations
 export interface ProjectWithVideos extends Project {
   videos: VideoSummary[];

@@ -60,6 +60,37 @@ export interface Image {
   createdAt: Date;
 }
 
+export interface Character {
+  id: string;
+  name: string;
+  description: string;
+  projectId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CharacterWithImages extends Character {
+  referenceImages: Image[];
+}
+
+// Model types for image generation
+export interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  cost: string;
+  speed: string;
+  supportsImageReference: boolean;
+  maxReferenceImages: number;
+}
+
+export interface ModelsResponse {
+  models: ModelInfo[];
+  default: string | null;
+  allModels?: ModelInfo[];  // All possible models (when none configured)
+  message?: string;
+}
+
 // Extended types with relations
 export interface ProjectWithVideos extends Project {
   videos: Video[];

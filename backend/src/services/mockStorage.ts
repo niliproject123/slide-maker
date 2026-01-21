@@ -7,6 +7,7 @@ import type {
   MainChat,
   Message,
   Image,
+  Character,
 } from "../types/index.js";
 
 // In-memory storage
@@ -18,11 +19,13 @@ export const storage = {
   mainChats: new Map<string, MainChat>(),
   messages: new Map<string, Message>(),
   images: new Map<string, Image>(),
+  characters: new Map<string, Character>(),
   // Many-to-many relations
   frameImages: new Map<string, Set<string>>(), // frameId -> Set<imageId>
   contextImages: new Map<string, Set<string>>(), // contextId -> Set<imageId>
   mainChatImages: new Map<string, Set<string>>(), // mainChatId -> Set<imageId>
   galleryImages: new Map<string, Set<string>>(), // projectId -> Set<imageId>
+  characterImages: new Map<string, Set<string>>(), // characterId -> Set<imageId>
 };
 
 // Helper to create an image
@@ -238,4 +241,35 @@ export function getMainChatMessageCount(mainChatId: string): number {
 export function getMainChatImageCount(mainChatId: string): number {
   const mainChatImages = storage.mainChatImages.get(mainChatId) || new Set();
   return mainChatImages.size;
+}
+
+// Character helpers
+export function createCharacterInternal(
+  projectId: string,
+  name: string,
+  description: string
+): Character {
+  const now = new Date();
+  const character: Character = {
+    id: uuidv4(),
+    name,
+    description,
+    projectId,
+    createdAt: now,
+    updatedAt: now,
+  };
+  storage.characters.set(character.id, character);
+  storage.characterImages.set(character.id, new Set());
+  return character;
+}
+
+export function getProjectCharacterCount(projectId: string): number {
+  return Array.from(storage.characters.values()).filter(
+    (c) => c.projectId === projectId
+  ).length;
+}
+
+export function getCharacterImageCount(characterId: string): number {
+  const characterImages = storage.characterImages.get(characterId) || new Set();
+  return characterImages.size;
 }
