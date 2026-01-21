@@ -1,6 +1,11 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { v4 as uuidv4 } from "uuid";
 import { storage, initializeMockData } from "../services/mockStorage.js";
+import {
+  generateImage,
+  isOpenAIConfigured,
+  type GenerateImageResult,
+} from "../services/openai.js";
 import type { Message, Image, MessageWithImages } from "../types/index.js";
 
 interface FrameIdParams {
@@ -15,15 +20,38 @@ interface GenerateFrameBody {
   prompt: string;
   withContext?: boolean;
   contextImageIds?: string[];
+  imageCount?: number;
 }
 
 interface GenerateContextBody {
   prompt: string;
   contextImageIds?: string[];
+  imageCount?: number;
 }
 
-// Simulate generation delay
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// Generate mock image for fallback
+function generateMockImage(): { url: string; cloudinaryId: string } {
+  const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return {
+    url: `https://picsum.photos/seed/${seed}/1792/1024`,
+    cloudinaryId: `mock-${seed}`,
+  };
+}
+
+// Get image URLs from image IDs
+function getImageUrls(imageIds: string[]): string[] {
+  return imageIds
+    .map((id) => storage.images.get(id)?.url)
+    .filter((url): url is string => !!url);
+}
+
+// Get context text for a video
+function getContextText(videoId: string): string | undefined {
+  const context = Array.from(storage.contexts.values()).find(
+    (c) => c.videoId === videoId
+  );
+  return context?.content || undefined;
+}
 
 export async function generateRoutes(fastify: FastifyInstance) {
   // POST /frames/:frameId/generate - Generate images for frame
@@ -36,7 +64,12 @@ export async function generateRoutes(fastify: FastifyInstance) {
       initializeMockData();
 
       const { frameId } = request.params;
-      const { prompt, withContext = false, contextImageIds = [] } = request.body;
+      const {
+        prompt,
+        withContext = false,
+        contextImageIds = [],
+        imageCount = 1,
+      } = request.body;
 
       const frame = storage.frames.get(frameId);
       if (!frame) {
@@ -53,10 +86,14 @@ export async function generateRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Simulate generation time
-      await delay(500);
+      // Get video for context
+      const video = storage.videos.get(frame.videoId);
+      const contextText = withContext && video ? getContextText(video.id) : undefined;
 
-      // Create message
+      // Get attached image URLs
+      const attachedImageUrls = getImageUrls(contextImageIds);
+
+      // Create message first
       const message: Message = {
         id: uuidv4(),
         prompt: prompt.trim(),
@@ -74,24 +111,63 @@ export async function generateRoutes(fastify: FastifyInstance) {
         .map((id) => storage.images.get(id))
         .filter((img): img is Image => img !== undefined);
 
-      // Generate 4 placeholder images using picsum
+      // Generate images
       const images: Image[] = [];
-      for (let i = 0; i < 4; i++) {
-        const seed = `${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
-        const image: Image = {
-          id: uuidv4(),
-          url: `https://picsum.photos/seed/${seed}/1792/1024`,
-          cloudinaryId: `mock-${seed}`,
-          messageId: message.id,
-          createdAt: new Date(),
-        };
-        storage.images.set(image.id, image);
-        images.push(image);
+      const count = Math.min(Math.max(1, imageCount), 4);
 
-        // Add to frame's images
-        const frameImages = storage.frameImages.get(frameId) || new Set();
-        frameImages.add(image.id);
-        storage.frameImages.set(frameId, frameImages);
+      if (isOpenAIConfigured()) {
+        // Use real OpenAI
+        for (let i = 0; i < count; i++) {
+          try {
+            const result: GenerateImageResult = await generateImage({
+              prompt: prompt.trim(),
+              attachedImageUrls: attachedImageUrls.length > 0 ? attachedImageUrls : undefined,
+              contextText,
+            });
+
+            const image: Image = {
+              id: uuidv4(),
+              url: result.url,
+              cloudinaryId: `openai-${Date.now()}-${i}`,
+              messageId: message.id,
+              createdAt: new Date(),
+            };
+            storage.images.set(image.id, image);
+            images.push(image);
+
+            // Add to frame's images
+            const frameImages = storage.frameImages.get(frameId) || new Set();
+            frameImages.add(image.id);
+            storage.frameImages.set(frameId, frameImages);
+          } catch (error) {
+            fastify.log.error(`Failed to generate image ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+
+        if (images.length === 0) {
+          return reply.status(500).send({
+            error: "Failed to generate images",
+            code: "GENERATION_ERROR",
+          });
+        }
+      } else {
+        // Fallback to mock images
+        for (let i = 0; i < count; i++) {
+          const mock = generateMockImage();
+          const image: Image = {
+            id: uuidv4(),
+            url: mock.url,
+            cloudinaryId: mock.cloudinaryId,
+            messageId: message.id,
+            createdAt: new Date(),
+          };
+          storage.images.set(image.id, image);
+          images.push(image);
+
+          const frameImages = storage.frameImages.get(frameId) || new Set();
+          frameImages.add(image.id);
+          storage.frameImages.set(frameId, frameImages);
+        }
       }
 
       const response: MessageWithImages = {
@@ -114,7 +190,7 @@ export async function generateRoutes(fastify: FastifyInstance) {
       initializeMockData();
 
       const { videoId } = request.params;
-      const { prompt, contextImageIds = [] } = request.body;
+      const { prompt, contextImageIds = [], imageCount = 1 } = request.body;
 
       const video = storage.videos.get(videoId);
       if (!video) {
@@ -142,8 +218,8 @@ export async function generateRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Simulate generation time
-      await delay(500);
+      // Get attached image URLs
+      const attachedImageUrls = getImageUrls(contextImageIds);
 
       // Create message
       const message: Message = {
@@ -163,24 +239,60 @@ export async function generateRoutes(fastify: FastifyInstance) {
         .map((id) => storage.images.get(id))
         .filter((img): img is Image => img !== undefined);
 
-      // Generate 4 placeholder images
+      // Generate images
       const images: Image[] = [];
-      for (let i = 0; i < 4; i++) {
-        const seed = `${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
-        const image: Image = {
-          id: uuidv4(),
-          url: `https://picsum.photos/seed/${seed}/1792/1024`,
-          cloudinaryId: `mock-${seed}`,
-          messageId: message.id,
-          createdAt: new Date(),
-        };
-        storage.images.set(image.id, image);
-        images.push(image);
+      const count = Math.min(Math.max(1, imageCount), 4);
 
-        // Add to context's images
-        const contextImages = storage.contextImages.get(context.id) || new Set();
-        contextImages.add(image.id);
-        storage.contextImages.set(context.id, contextImages);
+      if (isOpenAIConfigured()) {
+        for (let i = 0; i < count; i++) {
+          try {
+            const result = await generateImage({
+              prompt: prompt.trim(),
+              attachedImageUrls: attachedImageUrls.length > 0 ? attachedImageUrls : undefined,
+              contextText: context.content || undefined,
+            });
+
+            const image: Image = {
+              id: uuidv4(),
+              url: result.url,
+              cloudinaryId: `openai-${Date.now()}-${i}`,
+              messageId: message.id,
+              createdAt: new Date(),
+            };
+            storage.images.set(image.id, image);
+            images.push(image);
+
+            const contextImages = storage.contextImages.get(context.id) || new Set();
+            contextImages.add(image.id);
+            storage.contextImages.set(context.id, contextImages);
+          } catch (error) {
+            fastify.log.error(`Failed to generate image ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+
+        if (images.length === 0) {
+          return reply.status(500).send({
+            error: "Failed to generate images",
+            code: "GENERATION_ERROR",
+          });
+        }
+      } else {
+        for (let i = 0; i < count; i++) {
+          const mock = generateMockImage();
+          const image: Image = {
+            id: uuidv4(),
+            url: mock.url,
+            cloudinaryId: mock.cloudinaryId,
+            messageId: message.id,
+            createdAt: new Date(),
+          };
+          storage.images.set(image.id, image);
+          images.push(image);
+
+          const contextImages = storage.contextImages.get(context.id) || new Set();
+          contextImages.add(image.id);
+          storage.contextImages.set(context.id, contextImages);
+        }
       }
 
       const response: MessageWithImages = {
@@ -193,7 +305,7 @@ export async function generateRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // POST /frames/:frameId/upload - Upload image to frame (mock)
+  // POST /frames/:frameId/upload - Upload image to frame (mock for now)
   fastify.post<{ Params: FrameIdParams }>(
     "/frames/:frameId/upload",
     async (request: FastifyRequest<{ Params: FrameIdParams }>, reply: FastifyReply) => {
@@ -209,18 +321,17 @@ export async function generateRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Create a mock uploaded image
-      const seed = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Create a mock uploaded image (Cloudinary integration in Phase 2.2)
+      const mock = generateMockImage();
       const image: Image = {
         id: uuidv4(),
-        url: `https://picsum.photos/seed/${seed}/1792/1024`,
-        cloudinaryId: `mock-upload-${seed}`,
+        url: mock.url,
+        cloudinaryId: mock.cloudinaryId,
         messageId: null,
         createdAt: new Date(),
       };
       storage.images.set(image.id, image);
 
-      // Add to frame's images
       const frameImages = storage.frameImages.get(frameId) || new Set();
       frameImages.add(image.id);
       storage.frameImages.set(frameId, frameImages);
@@ -239,7 +350,7 @@ export async function generateRoutes(fastify: FastifyInstance) {
       initializeMockData();
 
       const { mainChatId } = request.params;
-      const { prompt, contextImageIds = [] } = request.body;
+      const { prompt, contextImageIds = [], imageCount = 1 } = request.body;
 
       const mainChat = storage.mainChats.get(mainChatId);
       if (!mainChat) {
@@ -256,8 +367,12 @@ export async function generateRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Simulate generation time
-      await delay(500);
+      // Get video context
+      const video = storage.videos.get(mainChat.videoId);
+      const contextText = video ? getContextText(video.id) : undefined;
+
+      // Get attached image URLs
+      const attachedImageUrls = getImageUrls(contextImageIds);
 
       // Create message
       const message: Message = {
@@ -277,24 +392,60 @@ export async function generateRoutes(fastify: FastifyInstance) {
         .map((id) => storage.images.get(id))
         .filter((img): img is Image => img !== undefined);
 
-      // Generate 4 placeholder images
+      // Generate images
       const images: Image[] = [];
-      for (let i = 0; i < 4; i++) {
-        const seed = `${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
-        const image: Image = {
-          id: uuidv4(),
-          url: `https://picsum.photos/seed/${seed}/1792/1024`,
-          cloudinaryId: `mock-${seed}`,
-          messageId: message.id,
-          createdAt: new Date(),
-        };
-        storage.images.set(image.id, image);
-        images.push(image);
+      const count = Math.min(Math.max(1, imageCount), 4);
 
-        // Add to main chat's images
-        const mainChatImages = storage.mainChatImages.get(mainChatId) || new Set();
-        mainChatImages.add(image.id);
-        storage.mainChatImages.set(mainChatId, mainChatImages);
+      if (isOpenAIConfigured()) {
+        for (let i = 0; i < count; i++) {
+          try {
+            const result = await generateImage({
+              prompt: prompt.trim(),
+              attachedImageUrls: attachedImageUrls.length > 0 ? attachedImageUrls : undefined,
+              contextText,
+            });
+
+            const image: Image = {
+              id: uuidv4(),
+              url: result.url,
+              cloudinaryId: `openai-${Date.now()}-${i}`,
+              messageId: message.id,
+              createdAt: new Date(),
+            };
+            storage.images.set(image.id, image);
+            images.push(image);
+
+            const mainChatImages = storage.mainChatImages.get(mainChatId) || new Set();
+            mainChatImages.add(image.id);
+            storage.mainChatImages.set(mainChatId, mainChatImages);
+          } catch (error) {
+            fastify.log.error(`Failed to generate image ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+
+        if (images.length === 0) {
+          return reply.status(500).send({
+            error: "Failed to generate images",
+            code: "GENERATION_ERROR",
+          });
+        }
+      } else {
+        for (let i = 0; i < count; i++) {
+          const mock = generateMockImage();
+          const image: Image = {
+            id: uuidv4(),
+            url: mock.url,
+            cloudinaryId: mock.cloudinaryId,
+            messageId: message.id,
+            createdAt: new Date(),
+          };
+          storage.images.set(image.id, image);
+          images.push(image);
+
+          const mainChatImages = storage.mainChatImages.get(mainChatId) || new Set();
+          mainChatImages.add(image.id);
+          storage.mainChatImages.set(mainChatId, mainChatImages);
+        }
       }
 
       const response: MessageWithImages = {
@@ -307,7 +458,7 @@ export async function generateRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // POST /main-chats/:mainChatId/upload - Upload image to main chat (mock)
+  // POST /main-chats/:mainChatId/upload - Upload image to main chat (mock for now)
   fastify.post<{ Params: { mainChatId: string } }>(
     "/main-chats/:mainChatId/upload",
     async (request: FastifyRequest<{ Params: { mainChatId: string } }>, reply: FastifyReply) => {
@@ -323,18 +474,17 @@ export async function generateRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Create a mock uploaded image
-      const seed = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Create a mock uploaded image (Cloudinary integration in Phase 2.2)
+      const mock = generateMockImage();
       const image: Image = {
         id: uuidv4(),
-        url: `https://picsum.photos/seed/${seed}/1792/1024`,
-        cloudinaryId: `mock-upload-${seed}`,
+        url: mock.url,
+        cloudinaryId: mock.cloudinaryId,
         messageId: null,
         createdAt: new Date(),
       };
       storage.images.set(image.id, image);
 
-      // Add to main chat's images
       const mainChatImages = storage.mainChatImages.get(mainChatId) || new Set();
       mainChatImages.add(image.id);
       storage.mainChatImages.set(mainChatId, mainChatImages);

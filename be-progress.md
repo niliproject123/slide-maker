@@ -1,121 +1,67 @@
-# Backend Progress - Phase 2.0
+# Backend Progress - Phase 2.1
 
 ## Status: COMPLETE
 
-### Phase 2.0 - All Mocked API
+### Phase 2.1 - Real OpenAI Integration
 
-This phase creates a Fastify API server that mirrors the frontend's `mockApi.ts` functionality. All data is stored in-memory (no real database), and all external services (OpenAI, Cloudinary) are mocked.
+This phase integrates real OpenAI API for image generation, replacing mock picsum images with DALL-E 3 generated images.
 
 ---
 
 ## Completed
 
-### 1. Project Setup
-- [x] Created `/backend` folder structure
-- [x] Initialized npm project with TypeScript
-- [x] Installed dependencies: fastify, @fastify/cors, @fastify/multipart, uuid, tsx, typescript
-- [x] Created `tsconfig.json` for ES modules
-- [x] Created `package.json` with dev/build scripts
+### Phase 2.0 - All Mocked API ✓
 
-### 2. Mock Storage Service (`src/services/mockStorage.ts`)
-- [x] In-memory storage maps for all entities
-- [x] Many-to-many relation maps (frameImages, contextImages, mainChatImages, galleryImages)
-- [x] Helper functions for creating entities (projects, videos, frames, mainChats)
-- [x] Helper functions for counting related entities
-- [x] Auto-initialization with sample data
-- [x] Auto-create default MainChat when creating a video
+- [x] Fastify API server with all endpoints
+- [x] In-memory storage for all entities
+- [x] Frontend API layer integration
 
-### 3. Types (`src/types/index.ts`)
-- [x] Base entity types: Project, Video, Context, Frame, MainChat, Message, Image
-- [x] Extended types with relations
-- [x] API response types
+### Phase 2.1 - Real OpenAI ✓
 
-### 4. Routes
+#### OpenAI Service (`src/services/openai.ts`)
+- [x] `generateImage()` - Generate images with DALL-E 3
+- [x] `analyzeImages()` - Analyze images with GPT-4o-mini vision
+- [x] `generateMultipleImages()` - Generate multiple images sequentially
+- [x] `isOpenAIConfigured()` - Check if API key is set
+- [x] Automatic vision analysis when reference images attached
+- [x] Context text integration in prompts
 
-#### Projects (`src/routes/projects.ts`)
-- [x] `GET /projects` - List all projects with counts
-- [x] `POST /projects` - Create new project
-- [x] `GET /projects/:id` - Get project with videos
-- [x] `PUT /projects/:id` - Update project name
-- [x] `DELETE /projects/:id` - Delete project and cascade
+#### Updated Generate Routes (`src/routes/generate.ts`)
+- [x] Frame generation with real DALL-E 3
+- [x] Context generation with real DALL-E 3
+- [x] MainChat generation with real DALL-E 3
+- [x] Fallback to mock images if `OPENAI_API_KEY` not set
+- [x] Support for `imageCount` parameter (1-4 images)
+- [x] Vision enhancement when `contextImageIds` provided
 
-#### Videos (`src/routes/videos.ts`)
-- [x] `GET /projects/:projectId/videos` - List videos in project
-- [x] `POST /projects/:projectId/videos` - Create video (auto-creates context + mainChat)
-- [x] `GET /videos/:id` - Get video with context, frames, and mainChats
-- [x] `PUT /videos/:id` - Update video name
-- [x] `DELETE /videos/:id` - Delete video and cascade (including mainChats)
+#### Test Endpoints (`src/routes/openaiTest.ts`)
+- [x] `GET /openai-test` - Raw OpenAI API tests
+  - Text completion (GPT-4o-mini)
+  - Image generation (DALL-E 3)
+  - Vision analysis (GPT-4o-mini with image)
+  - Image modification (Vision → DALL-E)
+- [x] `GET /api-generate-test` - API integration tests
+  - OpenAI service configuration check
+  - Simple image generation
+  - Generation with image reference
+  - Image analysis
+  - Full API flow (create entities → generate)
 
-#### Frames (`src/routes/frames.ts`)
-- [x] `GET /videos/:videoId/frames` - List frames in video
-- [x] `POST /videos/:videoId/frames` - Create frame
-- [x] `PUT /frames/:id` - Update frame title
-- [x] `PATCH /frames/:id/reorder` - Change frame order
-- [x] `PATCH /frames/:id/selected-image` - Set selected image
-- [x] `DELETE /frames/:id` - Delete frame
-- [x] `DELETE /frames/:id/history` - Clear message history
-- [x] `GET /frames/:id/messages` - Get frame messages
-- [x] `GET /frames/:id/images` - Get frame images
-
-#### Context (`src/routes/context.ts`)
-- [x] `GET /videos/:videoId/context` - Get context with images and messages
-- [x] `PATCH /videos/:videoId/context` - Update context text
-- [x] `POST /videos/:videoId/context/images` - Upload image (mock)
-- [x] `DELETE /videos/:videoId/context/history` - Clear message history
-- [x] `GET /videos/:videoId/context/messages` - Get context messages
-
-#### Main Chats (`src/routes/mainChats.ts`)
-- [x] `GET /videos/:videoId/main-chats` - List main chats in video
-- [x] `POST /videos/:videoId/main-chats` - Create main chat
-- [x] `GET /main-chats/:id` - Get main chat with messages
-- [x] `PUT /main-chats/:id` - Update main chat name
-- [x] `DELETE /main-chats/:id` - Delete main chat
-- [x] `DELETE /main-chats/:id/history` - Clear message history
-
-#### Generation (`src/routes/generate.ts`)
-- [x] `POST /frames/:frameId/generate` - Generate images for frame (mock)
-- [x] `POST /videos/:videoId/context/generate` - Generate images for context (mock)
-- [x] `POST /main-chats/:mainChatId/generate` - Generate images for main chat (mock)
-- [x] `POST /frames/:frameId/upload` - Upload image to frame (mock)
-- [x] `POST /main-chats/:mainChatId/upload` - Upload image to main chat (mock)
-
-#### Images (`src/routes/images.ts`)
-- [x] `GET /projects/:projectId/images` - Get all images grouped by video/frame
-- [x] `DELETE /images/:id` - Delete image completely
-- [x] `POST /images/:id/copy` - Copy image to another location (frame/context/gallery/mainChat)
-- [x] `POST /images/:id/move` - Move image between locations
-- [x] `POST /images/:id/remove` - Remove image from specific relation
-
-#### Gallery (`src/routes/gallery.ts`)
-- [x] `GET /projects/:projectId/gallery` - Get gallery images
-- [x] `POST /projects/:projectId/gallery` - Add image to gallery
-- [x] `DELETE /projects/:projectId/gallery/:imageId` - Remove from gallery
-- [x] `POST /projects/:projectId/gallery/upload` - Upload to gallery (mock)
-
-### 5. Server Entry (`src/index.ts`)
-- [x] Fastify server with CORS enabled
-- [x] Health check endpoint
-- [x] All routes registered (including mainChatRoutes)
-- [x] Production/development logger configuration
-
-### 6. Frontend Integration
-- [x] Created `frontend/src/lib/api.ts` - HTTP client with same interface as mockApi
-- [x] Updated `frontend/src/lib/mockApi.ts` - Re-exports from api.ts for backwards compatibility
-- [x] Set up `NEXT_PUBLIC_API_URL` environment variable support
+#### Frontend Test Page (`/openai-test`)
+- [x] Toggle between "Raw OpenAI Tests" and "API Generate Tests"
+- [x] Display input and output images
+- [x] Show request/response JSON
+- [x] Test status and duration
 
 ---
 
 ## Future Phases
 
-### Phase 2.1 - Real OpenAI
-- [ ] Add OpenAI SDK
-- [ ] Implement actual image generation with gpt-image-1
-- [ ] Environment variable for API key
-
 ### Phase 2.2 - Real Cloudinary
 - [ ] Add Cloudinary SDK
-- [ ] Implement actual image upload
-- [ ] Replace mock URLs with Cloudinary URLs
+- [ ] Upload generated images to Cloudinary
+- [ ] Store permanent Cloudinary URLs instead of temporary OpenAI URLs
+- [ ] Implement actual file upload for user images
 
 ### Phase 2.3 - Real PostgreSQL
 - [ ] Add Prisma ORM
@@ -124,66 +70,58 @@ This phase creates a Fastify API server that mirrors the frontend's `mockApi.ts`
 
 ---
 
-## How to Run
+## Environment Variables
 
 ### Backend
 ```bash
-cd backend
-
-# Development (with hot reload)
-npm run dev
-
-# Type check
-npm run typecheck
-
-# Build for production
-npm run build
-npm start
+OPENAI_API_KEY=sk-...      # Required for real image generation
+NODE_ENV=production        # Use JSON logging
+PORT=4000                  # Server port
 ```
-
-Server runs at `http://localhost:4000`
 
 ### Frontend
 ```bash
-cd frontend
-
-# Set API URL (optional, defaults to http://localhost:4000)
-export NEXT_PUBLIC_API_URL=http://localhost:4000
-
-# Development
-npm run dev
-
-# Build
-npm run build
+NEXT_PUBLIC_API_URL=https://your-backend.railway.app
 ```
 
 ---
 
-## Railway Deployment
+## How It Works
 
-### Backend Service
-- Root directory: `backend`
-- Build command: `npm install && npm run build`
-- Start command: `npm start`
-- Environment variables:
-  - `NODE_ENV=production`
-  - `PORT=4000` (Railway auto-assigns if not set)
+### Image Generation Flow
+1. User sends prompt + optional reference images
+2. If reference images provided:
+   - Vision model analyzes them
+   - Analysis added to generation prompt
+3. DALL-E 3 generates image(s)
+4. Image URLs stored in memory (Cloudinary in Phase 2.2)
 
-### Frontend Service
-- Root directory: `frontend`
-- Build command: `npm install && npm run build`
-- Start command: `npm start`
-- **Required environment variables:**
-  - `NEXT_PUBLIC_API_URL=https://<your-backend-service>.up.railway.app`
+### Fallback Behavior
+- If `OPENAI_API_KEY` not set → uses mock picsum.photos images
+- If generation fails → returns error (no partial results)
 
-**Important**: `NEXT_PUBLIC_*` variables are embedded at build time in Next.js. After adding/changing this variable, you must trigger a new deployment.
+---
+
+## API Changes
+
+### Generate Endpoints
+All generate endpoints now accept:
+```json
+{
+  "prompt": "A sunset over mountains",
+  "imageCount": 1,           // 1-4, default 1
+  "contextImageIds": ["..."], // Optional reference images
+  "withContext": true         // Include video context (frames only)
+}
+```
+
+Response unchanged - returns `MessageWithImages` with generated images.
 
 ---
 
 ## Notes
 
-- All "generate" endpoints return placeholder images from picsum.photos
-- All "upload" endpoints create mock images (no actual file handling yet)
-- Data persists only in memory (resets on server restart)
-- CORS is enabled for all origins (development mode)
-- Frontend automatically uses HTTP API when `NEXT_PUBLIC_API_URL` is set
+- DALL-E 3 only supports `n=1`, so multiple images are generated sequentially
+- Generated images have temporary OpenAI URLs (expire after ~1 hour)
+- Phase 2.2 will persist images to Cloudinary for permanent URLs
+- Vision model uses GPT-4o-mini for cost efficiency

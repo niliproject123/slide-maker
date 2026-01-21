@@ -22,31 +22,39 @@ interface TestResponse {
   error?: string;
 }
 
+type TestType = "openai" | "api";
+
 export default function OpenAITestPage() {
-  const [loading, setLoading] = useState(true);
+  const [testType, setTestType] = useState<TestType>("openai");
+  const [loading, setLoading] = useState(false);
   const [data, setData] = useState<TestResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const runTests = async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const response = await fetch(`${apiUrl}/openai-test`);
-        const result = await response.json();
+  const runTests = async (type: TestType) => {
+    setLoading(true);
+    setData(null);
+    setError(null);
 
-        if (!response.ok) {
-          setError(result.error || `HTTP ${response.status}`);
-        } else {
-          setData(result);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to connect to API");
-      } finally {
-        setLoading(false);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+      const endpoint = type === "openai" ? "/openai-test" : "/api-generate-test";
+      const response = await fetch(`${apiUrl}${endpoint}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || `HTTP ${response.status}`);
+      } else {
+        setData(result);
       }
-    };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to connect to API");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    runTests();
+  useEffect(() => {
+    runTests(testType);
   }, []);
 
   const getStatusIcon = (status: string) => {
@@ -63,12 +71,10 @@ export default function OpenAITestPage() {
   const getImageUrls = (result: TestResult): { input?: string; output?: string } => {
     const urls: { input?: string; output?: string } = {};
 
-    // Check request for input image
     if (result.request?.input_image_url) {
       urls.input = result.request.input_image_url as string;
     }
 
-    // Check response for images
     if (result.response) {
       if (result.response.input_image_url) {
         urls.input = result.response.input_image_url as string;
@@ -82,6 +88,9 @@ export default function OpenAITestPage() {
       if (result.response.generated_url) {
         urls.output = result.response.generated_url as string;
       }
+      if (result.response.imageUrl) {
+        urls.output = result.response.imageUrl as string;
+      }
     }
 
     return urls;
@@ -91,8 +100,44 @@ export default function OpenAITestPage() {
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <div className="max-w-5xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">OpenAI API Test</h1>
-        <p className="text-gray-400 mb-8">
-          Testing OpenAI integration on page load
+        <p className="text-gray-400 mb-6">
+          Testing OpenAI integration
+        </p>
+
+        {/* Test Type Selection */}
+        <div className="flex gap-4 mb-6">
+          <button
+            onClick={() => {
+              setTestType("openai");
+              runTests("openai");
+            }}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              testType === "openai"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+            }`}
+          >
+            Raw OpenAI Tests
+          </button>
+          <button
+            onClick={() => {
+              setTestType("api");
+              runTests("api");
+            }}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              testType === "api"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+            }`}
+          >
+            API Generate Tests
+          </button>
+        </div>
+
+        <p className="text-gray-500 text-sm mb-6">
+          {testType === "openai"
+            ? "Tests raw OpenAI API calls (chat, DALL-E, vision)"
+            : "Tests the generate API endpoints with OpenAI service integration"}
         </p>
 
         {loading && (

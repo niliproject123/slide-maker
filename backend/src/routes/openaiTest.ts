@@ -1,5 +1,17 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import OpenAI from "openai";
+import {
+  generateImage,
+  analyzeImages,
+  isOpenAIConfigured,
+} from "../services/openai.js";
+import {
+  storage,
+  initializeMockData,
+  createProjectInternal,
+  createVideoInternal,
+  createFrameInternal,
+} from "../services/mockStorage.js";
 
 interface TestResult {
   test: string;
@@ -198,6 +210,197 @@ export async function openaiTestRoutes(fastify: FastifyInstance) {
         };
         test4.status = "success";
         test4.duration = Date.now() - start;
+      } catch (err) {
+        test4.status = "error";
+        test4.error = err instanceof Error ? err.message : String(err);
+      }
+
+      const allPassed = results.every((r) => r.status === "success");
+
+      return reply.send({
+        summary: {
+          total: results.length,
+          passed: results.filter((r) => r.status === "success").length,
+          failed: results.filter((r) => r.status === "error").length,
+          allPassed,
+        },
+        results,
+      });
+    }
+  );
+
+  // GET /api-generate-test - Test the generate API endpoint with OpenAI service
+  fastify.get(
+    "/api-generate-test",
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      const results: TestResult[] = [];
+
+      // Check if OpenAI is configured
+      const test0: TestResult = {
+        test: "0. OpenAI Configuration Check",
+        status: "pending",
+      };
+      results.push(test0);
+
+      const configured = isOpenAIConfigured();
+      test0.response = { configured };
+      test0.status = configured ? "success" : "error";
+      test0.error = configured ? undefined : "OPENAI_API_KEY not set";
+
+      if (!configured) {
+        return reply.send({
+          summary: { total: 1, passed: 0, failed: 1, allPassed: false },
+          results,
+        });
+      }
+
+      // Test 1: OpenAI service - simple generation
+      const test1: TestResult = {
+        test: "1. OpenAI Service: Simple Image Generation",
+        status: "pending",
+      };
+      results.push(test1);
+
+      try {
+        const start = Date.now();
+        test1.request = {
+          prompt: "A simple blue square on white background, minimal",
+        };
+
+        const result = await generateImage({
+          prompt: "A simple blue square on white background, minimal",
+          size: "1024x1024",
+          quality: "standard",
+        });
+
+        test1.response = {
+          url: result.url,
+          revisedPrompt: result.revisedPrompt,
+        };
+        test1.status = "success";
+        test1.duration = Date.now() - start;
+      } catch (err) {
+        test1.status = "error";
+        test1.error = err instanceof Error ? err.message : String(err);
+      }
+
+      // Test 2: OpenAI service - generation with image reference
+      const test2: TestResult = {
+        test: "2. OpenAI Service: Generation with Image Reference",
+        status: "pending",
+      };
+      results.push(test2);
+
+      const referenceImageUrl = "https://picsum.photos/id/237/400/400";
+
+      try {
+        const start = Date.now();
+        test2.request = {
+          prompt: "Create a similar style image",
+          attachedImageUrls: [referenceImageUrl],
+        };
+
+        const result = await generateImage({
+          prompt: "Create a similar style image but with a cat instead",
+          attachedImageUrls: [referenceImageUrl],
+          size: "1024x1024",
+          quality: "standard",
+        });
+
+        test2.response = {
+          input_image_url: referenceImageUrl,
+          output_image_url: result.url,
+          revisedPrompt: result.revisedPrompt,
+        };
+        test2.status = "success";
+        test2.duration = Date.now() - start;
+      } catch (err) {
+        test2.status = "error";
+        test2.error = err instanceof Error ? err.message : String(err);
+      }
+
+      // Test 3: OpenAI service - analyze image
+      const test3: TestResult = {
+        test: "3. OpenAI Service: Analyze Image",
+        status: "pending",
+      };
+      results.push(test3);
+
+      try {
+        const start = Date.now();
+        test3.request = {
+          imageUrls: [referenceImageUrl],
+          prompt: "Describe this image",
+        };
+
+        const result = await analyzeImages({
+          imageUrls: [referenceImageUrl],
+          prompt: "Describe this image in 2 sentences.",
+        });
+
+        test3.response = {
+          input_image_url: referenceImageUrl,
+          description: result.description,
+        };
+        test3.status = "success";
+        test3.duration = Date.now() - start;
+      } catch (err) {
+        test3.status = "error";
+        test3.error = err instanceof Error ? err.message : String(err);
+      }
+
+      // Test 4: Full API flow - create project, video, frame, then generate
+      const test4: TestResult = {
+        test: "4. Full API Flow: Generate via Frame Endpoint",
+        status: "pending",
+      };
+      results.push(test4);
+
+      try {
+        const start = Date.now();
+        initializeMockData();
+
+        // Create test data
+        const project = createProjectInternal("API Test Project");
+        const video = createVideoInternal(project.id, "API Test Video");
+        const frame = createFrameInternal(video.id, "API Test Frame");
+
+        test4.request = {
+          projectId: project.id,
+          videoId: video.id,
+          frameId: frame.id,
+          prompt: "A beautiful sunset over mountains",
+        };
+
+        // Call the generate endpoint internally
+        const response = await fastify.inject({
+          method: "POST",
+          url: `/frames/${frame.id}/generate`,
+          payload: {
+            prompt: "A beautiful sunset over mountains",
+            imageCount: 1,
+          },
+        });
+
+        const body = JSON.parse(response.body);
+
+        if (response.statusCode !== 201) {
+          throw new Error(body.error || `HTTP ${response.statusCode}`);
+        }
+
+        test4.response = {
+          messageId: body.id,
+          prompt: body.prompt,
+          imageCount: body.images?.length,
+          imageUrl: body.images?.[0]?.url,
+        };
+        test4.status = "success";
+        test4.duration = Date.now() - start;
+
+        // Cleanup test data
+        storage.projects.delete(project.id);
+        storage.videos.delete(video.id);
+        storage.frames.delete(frame.id);
       } catch (err) {
         test4.status = "error";
         test4.error = err instanceof Error ? err.message : String(err);
