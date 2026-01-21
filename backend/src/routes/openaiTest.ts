@@ -108,7 +108,7 @@ export async function openaiTestRoutes(fastify: FastifyInstance) {
                 {
                   type: "image_url" as const,
                   image_url: {
-                    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Solid_blue.svg/100px-Solid_blue.svg.png"
+                    url: "https://placehold.co/200x200/0000FF/0000FF.png"
                   }
                 },
               ],
@@ -118,7 +118,7 @@ export async function openaiTestRoutes(fastify: FastifyInstance) {
         };
         test3.request = {
           ...visionRequest,
-          messages: [{ role: "user", content: "[text + image_url]" }],
+          messages: [{ role: "user", content: "[text + image_url: blue square from placehold.co]" }],
           _note: "Asking about a solid blue image",
         };
 
@@ -155,7 +155,7 @@ export async function openaiTestRoutes(fastify: FastifyInstance) {
                 {
                   type: "image_url" as const,
                   image_url: {
-                    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Camponotus_flavomarginatus_ant.jpg/100px-Camponotus_flavomarginatus_ant.jpg"
+                    url: "https://picsum.photos/id/237/200/200"
                   }
                 },
               ],
@@ -176,7 +176,7 @@ export async function openaiTestRoutes(fastify: FastifyInstance) {
         };
 
         test4.request = {
-          step1_describe: { model: "gpt-4o-mini", input_image: "ant.jpg" },
+          step1_describe: { model: "gpt-4o-mini", input_image: "picsum dog photo" },
           step2_generate: generateRequest,
         };
 
