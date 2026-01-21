@@ -27,14 +27,21 @@ import {
   ArrowRightLeft,
   MessageSquare,
   Menu,
+  Settings,
+  DollarSign,
+  Zap,
 } from "lucide-react";
 import { mockApi } from "@/lib/mockApi";
+import { api } from "@/lib/api";
 import type {
   VideoWithDetails,
   ContextWithImages,
   Image as ImageType,
   MessageWithImages,
   MainChatWithMessages,
+  ModelInfo,
+  ModelsResponse,
+  CharacterWithImages,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,7 +87,7 @@ export default function VideoEditorPage() {
   // Image picker modal
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [imagePickerTarget, setImagePickerTarget] = useState<"frame" | "context" | "mainChat">("frame");
-  const [imagePickerTab, setImagePickerTab] = useState<"current" | "gallery">("current");
+  const [imagePickerTab, setImagePickerTab] = useState<"current" | "gallery" | "characters">("current");
 
   // Copy to frame modal
   const [copyToFrameOpen, setCopyToFrameOpen] = useState(false);
@@ -88,6 +95,9 @@ export default function VideoEditorPage() {
 
   // Gallery images
   const [galleryImages, setGalleryImages] = useState<ImageType[]>([]);
+
+  // Characters
+  const [characters, setCharacters] = useState<CharacterWithImages[]>([]);
 
   // Main view tab: "frames" or "mainChat"
   const [mainView, setMainView] = useState<"frames" | "mainChat">("frames");
@@ -101,6 +111,13 @@ export default function VideoEditorPage() {
   // Mobile sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Model selection
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [defaultModel, setDefaultModel] = useState<string | null>(null);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+
   // Chat scroll ref
   const chatEndRef = useRef<HTMLDivElement>(null);
   const mainChatEndRef = useRef<HTMLDivElement>(null);
@@ -110,7 +127,24 @@ export default function VideoEditorPage() {
 
   useEffect(() => {
     loadVideo();
+    loadModels();
   }, [videoId]);
+
+  async function loadModels() {
+    setModelsLoading(true);
+    try {
+      const response: ModelsResponse = await api.models.list();
+      setModels(response.models);
+      setDefaultModel(response.default);
+      if (response.default && !selectedModel) {
+        setSelectedModel(response.default);
+      }
+    } catch (error) {
+      console.error("Failed to load models:", error);
+    } finally {
+      setModelsLoading(false);
+    }
+  }
 
   useEffect(() => {
     // Scroll to bottom of chat when messages change
@@ -133,10 +167,14 @@ export default function VideoEditorPage() {
     if (videoData && videoData.mainChats.length > 0 && !selectedMainChatId) {
       setSelectedMainChatId(videoData.mainChats[0].id);
     }
-    // Load gallery images
+    // Load gallery images and characters
     if (videoData) {
-      const gallery = await mockApi.gallery.list(videoData.projectId);
+      const [gallery, chars] = await Promise.all([
+        mockApi.gallery.list(videoData.projectId),
+        api.characters.list(videoData.projectId),
+      ]);
       setGalleryImages(gallery);
+      setCharacters(chars);
     }
     setLoading(false);
   }
@@ -163,7 +201,13 @@ export default function VideoEditorPage() {
     if (!prompt.trim() || !selectedFrameId) return;
     setGenerating(true);
     const attachedImageIds = attachedImages.map((img) => img.id);
-    await mockApi.generate.images(selectedFrameId, prompt.trim(), useContext, attachedImageIds);
+    await mockApi.generate.images(
+      selectedFrameId,
+      prompt.trim(),
+      useContext,
+      attachedImageIds,
+      { model: selectedModel || undefined }
+    );
     setPrompt("");
     setAttachedImages([]);
     setGenerating(false);
@@ -174,7 +218,12 @@ export default function VideoEditorPage() {
     if (!contextPrompt.trim() || !context) return;
     setGeneratingContext(true);
     const attachedImageIds = contextAttachedImages.map((img) => img.id);
-    await mockApi.generate.contextImages(context.id, contextPrompt.trim(), attachedImageIds);
+    await mockApi.generate.contextImages(
+      context.id,
+      contextPrompt.trim(),
+      attachedImageIds,
+      { model: selectedModel || undefined }
+    );
     setContextPrompt("");
     setContextAttachedImages([]);
     setGeneratingContext(false);
@@ -185,7 +234,12 @@ export default function VideoEditorPage() {
     if (!mainChatPrompt.trim() || !selectedMainChatId) return;
     setGeneratingMainChat(true);
     const attachedImageIds = mainChatAttachedImages.map((img) => img.id);
-    await mockApi.generate.mainChatImages(selectedMainChatId, mainChatPrompt.trim(), attachedImageIds);
+    await mockApi.generate.mainChatImages(
+      selectedMainChatId,
+      mainChatPrompt.trim(),
+      attachedImageIds,
+      { model: selectedModel || undefined }
+    );
     setMainChatPrompt("");
     setMainChatAttachedImages([]);
     setGeneratingMainChat(false);
@@ -285,6 +339,7 @@ export default function VideoEditorPage() {
 
   const selectedFrame = video?.frames.find((f) => f.id === selectedFrameId);
   const selectedMainChat = video?.mainChats.find((mc) => mc.id === selectedMainChatId);
+  const currentModel = models.find((m) => m.id === selectedModel);
 
   // Get available images for picker
   const availableImages = imagePickerTarget === "frame"
@@ -367,7 +422,7 @@ export default function VideoEditorPage() {
                 )}
                 onClick={() => setImagePickerTab("current")}
               >
-                {imagePickerTarget === "frame" ? "Frame Images" : imagePickerTarget === "mainChat" ? "Main Chat Images" : "Context Images"}
+                {imagePickerTarget === "frame" ? "Frame" : imagePickerTarget === "mainChat" ? "Chat" : "Context"}
               </button>
               <button
                 className={cn(
@@ -379,6 +434,17 @@ export default function VideoEditorPage() {
                 onClick={() => setImagePickerTab("gallery")}
               >
                 Gallery
+              </button>
+              <button
+                className={cn(
+                  "flex-1 py-2 text-sm font-medium transition-colors",
+                  imagePickerTab === "characters"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-zinc-500 hover:text-zinc-700"
+                )}
+                onClick={() => setImagePickerTab("characters")}
+              >
+                Characters
               </button>
             </div>
             <div className="flex-1 p-4 overflow-auto">
@@ -392,6 +458,43 @@ export default function VideoEditorPage() {
                     {availableImages.map((img) => {
                       const isSelected = imagePickerTarget === "frame"
                         ? attachedImages.some((a) => a.id === img.id)
+                        : imagePickerTarget === "mainChat"
+                        ? mainChatAttachedImages.some((a) => a.id === img.id)
+                        : contextAttachedImages.some((a) => a.id === img.id);
+                      return (
+                        <div
+                          key={img.id}
+                          className={cn(
+                            "relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
+                            isSelected
+                              ? "border-blue-500 ring-2 ring-blue-500/20"
+                              : "border-transparent hover:border-zinc-300"
+                          )}
+                          onClick={() => handleSelectFromPicker(img)}
+                        >
+                          <Image src={img.url} alt="" fill className="object-cover" />
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1">
+                              <Check className="w-3 h-3" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : imagePickerTab === "gallery" ? (
+                galleryImages.length === 0 ? (
+                  <p className="text-center text-zinc-500 py-8">
+                    No gallery images. Copy images to the gallery first!
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {galleryImages.map((img) => {
+                      const isSelected = imagePickerTarget === "frame"
+                        ? attachedImages.some((a) => a.id === img.id)
+                        : imagePickerTarget === "mainChat"
+                        ? mainChatAttachedImages.some((a) => a.id === img.id)
                         : contextAttachedImages.some((a) => a.id === img.id);
                       return (
                         <div
@@ -416,36 +519,56 @@ export default function VideoEditorPage() {
                   </div>
                 )
               ) : (
-                galleryImages.length === 0 ? (
-                  <p className="text-center text-zinc-500 py-8">
-                    No gallery images. Copy images to the gallery first!
-                  </p>
+                /* Characters tab */
+                characters.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-zinc-500 mb-2">No characters yet</p>
+                    <p className="text-xs text-zinc-400">
+                      Create characters in the project page to use their reference images here.
+                    </p>
+                  </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {galleryImages.map((img) => {
-                      const isSelected = imagePickerTarget === "frame"
-                        ? attachedImages.some((a) => a.id === img.id)
-                        : contextAttachedImages.some((a) => a.id === img.id);
-                      return (
-                        <div
-                          key={img.id}
-                          className={cn(
-                            "relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
-                            isSelected
-                              ? "border-blue-500 ring-2 ring-blue-500/20"
-                              : "border-transparent hover:border-zinc-300"
-                          )}
-                          onClick={() => handleSelectFromPicker(img)}
-                        >
-                          <Image src={img.url} alt="" fill className="object-cover" />
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1">
-                              <Check className="w-3 h-3" />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                  <div className="space-y-4">
+                    {characters.map((character) => (
+                      <div key={character.id} className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
+                        <p className="font-medium text-sm mb-1">{character.name}</p>
+                        {character.description && (
+                          <p className="text-xs text-zinc-500 mb-2">{character.description}</p>
+                        )}
+                        {character.referenceImages.length === 0 ? (
+                          <p className="text-xs text-zinc-400">No reference images</p>
+                        ) : (
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            {character.referenceImages.map((img) => {
+                              const isSelected = imagePickerTarget === "frame"
+                                ? attachedImages.some((a) => a.id === img.id)
+                                : imagePickerTarget === "mainChat"
+                                ? mainChatAttachedImages.some((a) => a.id === img.id)
+                                : contextAttachedImages.some((a) => a.id === img.id);
+                              return (
+                                <div
+                                  key={img.id}
+                                  className={cn(
+                                    "relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
+                                    isSelected
+                                      ? "border-blue-500 ring-2 ring-blue-500/20"
+                                      : "border-transparent hover:border-zinc-300"
+                                  )}
+                                  onClick={() => handleSelectFromPicker(img)}
+                                >
+                                  <Image src={img.url} alt="" fill className="object-cover" />
+                                  {isSelected && (
+                                    <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full p-0.5">
+                                      <Check className="w-2 h-2" />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )
               )}
@@ -635,6 +758,80 @@ export default function VideoEditorPage() {
                   Generate
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Model Selector Modal */}
+      {modelSelectorOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-0 sm:p-8">
+          <div className="bg-white dark:bg-zinc-950 sm:rounded-lg w-full h-full sm:h-auto sm:max-w-md">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="font-semibold">Select Model</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setModelSelectorOpen(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+              {modelsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
+                </div>
+              ) : models.length === 0 ? (
+                <p className="text-center text-zinc-500 py-4">
+                  No models available. Check API configuration.
+                </p>
+              ) : (
+                models.map((model) => (
+                  <button
+                    key={model.id}
+                    className={cn(
+                      "w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors",
+                      selectedModel === model.id
+                        ? "bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800"
+                        : "hover:bg-zinc-100 dark:hover:bg-zinc-900 border border-transparent"
+                    )}
+                    onClick={() => {
+                      setSelectedModel(model.id);
+                      setModelSelectorOpen(false);
+                    }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{model.name}</p>
+                        {model.id === defaultModel && (
+                          <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
+                        <span className="flex items-center gap-1">
+                          <DollarSign className="w-3 h-3" />
+                          {model.cost}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Zap className="w-3 h-3" />
+                          {model.speed}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        {model.supportsImageReference
+                          ? `Supports up to ${model.maxReferenceImages} reference images`
+                          : "Text-to-image only"}
+                      </p>
+                    </div>
+                    {selectedModel === model.id && (
+                      <Check className="w-4 h-4 text-blue-500 flex-shrink-0 mt-1" />
+                    )}
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -1238,6 +1435,15 @@ export default function VideoEditorPage() {
                       variant="outline"
                       size="icon"
                       className="h-10 w-10 flex-shrink-0"
+                      onClick={() => setModelSelectorOpen(true)}
+                      title="Select model"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10 flex-shrink-0"
                       onClick={() => openImagePicker("frame")}
                       title="Attach reference image"
                     >
@@ -1256,9 +1462,24 @@ export default function VideoEditorPage() {
                       <span className="hidden sm:inline ml-1">Generate</span>
                     </Button>
                   </div>
-                  <p className="text-xs text-zinc-400 mt-2 hidden sm:block">
-                    Press Enter to generate. Hover images for actions: select, copy to frame, copy to gallery, or delete.
-                  </p>
+                  {/* Model indicator */}
+                  <div className="flex items-center justify-between mt-2 text-xs">
+                    <p className="text-zinc-400 hidden sm:block">
+                      Press Enter to generate. Hover images for actions.
+                    </p>
+                    {currentModel && (
+                      <button
+                        className="flex items-center gap-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+                        onClick={() => setModelSelectorOpen(true)}
+                      >
+                        <span className="font-medium">{currentModel.name}</span>
+                        <span className="flex items-center gap-0.5 text-green-600 dark:text-green-400">
+                          <DollarSign className="w-3 h-3" />
+                          {currentModel.cost}
+                        </span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </>
@@ -1408,6 +1629,15 @@ export default function VideoEditorPage() {
                           variant="outline"
                           size="icon"
                           className="h-10 w-10 flex-shrink-0"
+                          onClick={() => setModelSelectorOpen(true)}
+                          title="Select model"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 flex-shrink-0"
                           onClick={() => openImagePicker("mainChat")}
                           title="Attach reference image"
                         >
@@ -1426,9 +1656,24 @@ export default function VideoEditorPage() {
                           <span className="hidden sm:inline ml-1">Generate</span>
                         </Button>
                       </div>
-                      <p className="text-xs text-zinc-400 mt-2 hidden sm:block">
-                        Generate images here and copy them to frames using the swap icon.
-                      </p>
+                      {/* Model indicator */}
+                      <div className="flex items-center justify-between mt-2 text-xs">
+                        <p className="text-zinc-400 hidden sm:block">
+                          Generate images here and copy them to frames.
+                        </p>
+                        {currentModel && (
+                          <button
+                            className="flex items-center gap-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+                            onClick={() => setModelSelectorOpen(true)}
+                          >
+                            <span className="font-medium">{currentModel.name}</span>
+                            <span className="flex items-center gap-0.5 text-green-600 dark:text-green-400">
+                              <DollarSign className="w-3 h-3" />
+                              {currentModel.cost}
+                            </span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </>

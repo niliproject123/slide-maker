@@ -35,6 +35,7 @@ type FalImageSize = "square_hd" | "square" | "portrait_4_3" | "portrait_16_9" | 
 
 /**
  * Convert size string to fal image_size format
+ * Default to TikTok portrait (9:16 ratio)
  */
 function toFalSize(size?: string): FalImageSize {
   switch (size) {
@@ -45,7 +46,8 @@ function toFalSize(size?: string): FalImageSize {
     case "1024x1792":
       return "portrait_16_9";
     default:
-      return "landscape_16_9";
+      // Default to TikTok portrait (9:16)
+      return "portrait_16_9";
   }
 }
 

@@ -48,13 +48,15 @@ export async function generateImages(
 
 /**
  * Generate mock images (for development without API keys)
+ * Default to TikTok portrait size (1024x1792)
  */
 export function generateMockImages(count: number = 1): GenerateResult {
   const images = [];
   for (let i = 0; i < count; i++) {
     const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}-${i}`;
+    // TikTok portrait size: 1024x1792 (9:16 ratio)
     images.push({
-      url: `https://picsum.photos/seed/${seed}/1792/1024`,
+      url: `https://picsum.photos/seed/${seed}/1024/1792`,
     });
   }
 

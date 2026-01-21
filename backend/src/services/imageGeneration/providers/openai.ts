@@ -90,7 +90,7 @@ class OpenAIProvider implements ImageGenerationProvider {
       referenceImageUrls = [],
       contextText,
       imageCount = 1,
-      size = "1792x1024",
+      size = "1024x1792",  // Default to TikTok portrait (9:16)
       quality = "standard",
     } = options;
 
